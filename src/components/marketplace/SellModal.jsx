@@ -63,21 +63,22 @@ export default function SellModal() {
         return;
       }
 
-      // Construct FormData for multipart upload
+      // Construct FormData for multipart upload matching backend router exactly
       const formData = new FormData();
       formData.append('title', title);
       formData.append('price', Number(price));
+      formData.append('description', description || "No detailed description provided.");
+      formData.append('category', category);
+      formData.append('condition', condition);
+      formData.append('tags', JSON.stringify(tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]));
+
       if (originalPrice) {
         formData.append('original_price', Number(originalPrice));
       }
-      formData.append('condition', condition);
-      formData.append('category', category);
-      formData.append('description', description || "No detailed description provided.");
-      formData.append('tags', JSON.stringify(tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]));
 
-      // If a custom file is uploaded, use it. Otherwise, submit the preset URL as a text form field.
+      // Handle image payload mapping
       if (customFile) {
-        formData.append('image', customFile);
+        formData.append('image', customFile); // Must match backend 'image' key exactly
       } else {
         formData.append('image_url', imagePresets[selectedPreset].url);
       }
@@ -85,8 +86,8 @@ export default function SellModal() {
       // Perform POST request to FastAPI endpoint with form-data
       const response = await axios.post(`${API_URL}/api/products`, formData, {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         }
       });
 
