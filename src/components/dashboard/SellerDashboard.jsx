@@ -171,7 +171,7 @@ export default function SellerDashboard() {
       };
 
       ws.onclose = () => {
-        print(`WebSocket closed for seller conversation: ${selectedBuyerConv.id}`);
+        console.log(`WebSocket closed for seller conversation: ${selectedBuyerConv.id}`);
       };
 
     } catch (err) {
