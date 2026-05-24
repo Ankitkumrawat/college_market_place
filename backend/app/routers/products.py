@@ -10,7 +10,7 @@ from app.utils.cloudinary import upload_image
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
 @router.post("", response_model=schemas.ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(
+async def create_product(
     title: str = Form(...),
     price: float = Form(...),
     original_price: Optional[float] = Form(None),
@@ -19,7 +19,7 @@ def create_product(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     image_url: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
+    image: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
