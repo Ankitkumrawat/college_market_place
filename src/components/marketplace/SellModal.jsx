@@ -75,14 +75,11 @@ export default function SellModal() {
       formData.append('description', description || "No detailed description provided.");
       formData.append('tags', JSON.stringify(tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]));
 
-      // If a custom file is uploaded, use it. Otherwise, fetch the preset image and convert to file.
+      // If a custom file is uploaded, use it. Otherwise, submit the preset URL as a text form field.
       if (customFile) {
         formData.append('image', customFile);
       } else {
-        const response = await fetch(imagePresets[selectedPreset].url);
-        const blob = await response.blob();
-        const presetFile = new File([blob], 'preset.jpg', { type: 'image/jpeg' });
-        formData.append('image', presetFile);
+        formData.append('image_url', imagePresets[selectedPreset].url);
       }
 
       // Perform POST request to FastAPI endpoint with form-data

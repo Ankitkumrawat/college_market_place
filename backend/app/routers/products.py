@@ -18,16 +18,23 @@ def create_product(
     category: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
-    image: UploadFile = File(...),
+    image_url: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """Post a new product in the marketplace. Requires login."""
-    try:
-        image_url = upload_image(image.file)
-    except Exception as e:
-        print(f"Unexpected image upload exception: {str(e)}. Using fallback placeholder.")
-        image_url = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=500"
+    image_final_url = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=500"
+    
+    if image:
+        try:
+            image_final_url = upload_image(image.file)
+        except Exception as e:
+            print(f"Unexpected image upload exception: {str(e)}. Using fallback/provided image.")
+            if image_url:
+                image_final_url = image_url
+    elif image_url:
+        image_final_url = image_url
 
     parsed_tags = ["CollegeItem"]
     if tags:
@@ -42,7 +49,7 @@ def create_product(
         original_price=original_price,
         condition=condition,
         category=category,
-        image_url=image_url,
+        image_url=image_final_url,
         description=description or "No detailed description provided.",
         tags=parsed_tags,
         seller_id=current_user.id,

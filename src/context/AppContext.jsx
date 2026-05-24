@@ -254,11 +254,7 @@ export const AppProvider = ({ children }) => {
       if (newProduct.imageFile) {
         formData.append('image', newProduct.imageFile);
       } else if (newProduct.image) {
-        // If it's a URL (preset), fetch and convert it to a file
-        const response = await fetch(newProduct.image);
-        const blob = await response.blob();
-        const file = new File([blob], 'preset.jpg', { type: 'image/jpeg' });
-        formData.append('image', file);
+        formData.append('image_url', newProduct.image);
       }
 
       await axios.post(`${API_URL}/api/products`, formData, {
