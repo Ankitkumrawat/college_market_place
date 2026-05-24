@@ -71,7 +71,8 @@ def get_products(
     db: Session = Depends(get_db)
 ):
     """Retrieve products matching filters (search text, category, price, condition)."""
-    query = db.query(models.Product)
+    # 🌟 BAS IS EK LINE KO BADLA HAI BHAI (Taaki bika hua saaman main screen par na dikhe)
+    query = db.query(models.Product).filter(models.Product.is_sold == False)
     
     if q:
         query = query.filter(
