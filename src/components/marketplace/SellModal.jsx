@@ -67,14 +67,11 @@ export default function SellModal() {
       const formData = new FormData();
       formData.append('title', title);
       formData.append('price', Number(price));
-      formData.append('description', description || "No detailed description provided.");
+      formData.append('original_price', originalPrice ? Number(originalPrice) : '');
+      formData.append('description', description || '');
       formData.append('category', category);
       formData.append('condition', condition);
       formData.append('tags', JSON.stringify(tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]));
-
-      if (originalPrice) {
-        formData.append('original_price', Number(originalPrice));
-      }
 
       // Handle image payload mapping
       if (customFile) {

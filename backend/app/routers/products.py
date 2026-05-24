@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/products", tags=["Products"])
 async def create_product(
     title: str = Form(...),
     price: float = Form(...),
-    original_price: Optional[float] = Form(None),
+    original_price: Optional[str] = Form(None),
     condition: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -43,10 +43,18 @@ async def create_product(
         except Exception:
             parsed_tags = [t.strip() for t in tags.split(",") if t.strip()]
 
+    # Parse original price safely to avoid float conversion crashes on empty form strings
+    parsed_original_price = None
+    if original_price and original_price.strip() != "":
+        try:
+            parsed_original_price = float(original_price)
+        except ValueError:
+            pass
+
     db_product = models.Product(
         title=title,
         price=price,
-        original_price=original_price,
+        original_price=parsed_original_price,
         condition=condition,
         category=category,
         image_url=image_final_url,
