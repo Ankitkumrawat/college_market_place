@@ -40,7 +40,7 @@ export default function SellerDashboard() {
       : (rawImage ? `${API_URL}/${rawImage}` : '');
   };
 
-  // Fetch products & conversations
+  // Fetch Seller's Products & Conversations from Backend
   const fetchData = async () => {
     setIsLoadingProducts(true);
     const token = localStorage.getItem('token');
@@ -49,27 +49,23 @@ export default function SellerDashboard() {
       return;
     }
     try {
-      const [prodRes, convRes] = await Promise.all([
-        axios.get(`${API_URL}/api/seller/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/api/seller/conversations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-      
-      setProducts(prodRes.data);
+      // 1. Fetch seller's own products
+      const prodRes = await axios.get(`${API_URL}/api/products`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+// Filter products belonging to current user
+      const myProducts = prodRes.data.filter(p => p.seller_id === currentUser?.id);
+      setProducts(myProducts);
+
+      // 🌟 FIXED: Python comment (#) hata kar proper JS comment (//) lagaya aur active seller data pull kiya
+      const convRes = await axios.get(`${API_URL}/api/buyer/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setConversations(convRes.data);
-      
-      // Auto-select first product if none selected yet
-      if (prodRes.data.length > 0) {
-        if (!selectedProduct) {
-          setSelectedProduct(prodRes.data[0]);
-        } else {
-          // Update selectedProduct object to capture status updates
-          const updated = prodRes.data.find(p => p.id === selectedProduct.id);
-          if (updated) setSelectedProduct(updated);
-        }
+
+      if (selectedProduct) {
+        const updated = myProducts.find(p => p.id === selectedProduct.id);
+        if (updated) setSelectedProduct(updated);
       }
     } catch (err) {
       console.error("Failed to load seller dashboard data:", err);
@@ -80,8 +76,10 @@ export default function SellerDashboard() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (currentUser) {
+      fetchData();
+    }
+  }, [currentUser]);
 
   // Update interested buyers list when selectedProduct or conversations change
   useEffect(() => {
@@ -95,7 +93,6 @@ export default function SellerDashboard() {
     setProductBuyers(filteredConvs);
 
     if (filteredConvs.length > 0) {
-      // Auto-select the first buyer conversation if none is active or if the active one isn't in the list
       const stillExists = filteredConvs.find(c => c.id === selectedBuyerConv?.id);
       if (!stillExists) {
         setSelectedBuyerConv(filteredConvs[0]);
@@ -139,7 +136,6 @@ export default function SellerDashboard() {
       return;
     }
 
-    // Load message history
     fetchMessages(selectedBuyerConv.id);
 
     const token = localStorage.getItem('token');
@@ -175,7 +171,7 @@ export default function SellerDashboard() {
       };
 
       ws.onclose = () => {
-        console.log(`WebSocket closed for seller conversation: ${selectedBuyerConv.id}`);
+        print(`WebSocket closed for seller conversation: ${selectedBuyerConv.id}`);
       };
 
     } catch (err) {
@@ -243,7 +239,6 @@ export default function SellerDashboard() {
     if (!selectedProduct || !selectedBuyerConv) return;
     const res = await markProductAsSold(selectedProduct.id, selectedBuyerConv.buyer_id);
     if (res && res.success) {
-      // Reload page data
       fetchData();
     }
   };
@@ -254,13 +249,12 @@ export default function SellerDashboard() {
   };
 
   return (
-    <div className="h-[75vh] flex rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden animate-fade-in">
+    <div className="h-[75vh] flex rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
       
       {/* Left Items Sidebar */}
-      <div className="w-1/3 sm:w-1/4 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-955/60 flex flex-col justify-between">
+      <div className="w-1/3 sm:w-1/4 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex flex-col justify-between">
         <div className="flex-1 flex flex-col min-h-0">
           
-          {/* Header */}
           <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <h2 className="text-sm sm:text-base font-black tracking-tight text-slate-800 dark:text-slate-100 flex items-center uppercase">
               <ShoppingBag className="w-4 h-4 mr-2 text-indigo-500" />
@@ -268,7 +262,6 @@ export default function SellerDashboard() {
             </h2>
           </div>
 
-          {/* Product Items Navigation List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {isLoadingProducts ? (
               <div className="text-center py-10 text-xs text-slate-400 font-medium animate-pulse">
@@ -283,7 +276,7 @@ export default function SellerDashboard() {
                 </p>
                 <button
                   onClick={() => setIsSellModalOpen(true)}
-                  className="mt-2 px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] flex items-center justify-center mx-auto"
+                  className="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] flex items-center justify-center mx-auto"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1 stroke-[3]" /> Upload Item
                 </button>
@@ -302,34 +295,26 @@ export default function SellerDashboard() {
                         : 'bg-white dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 hover:border-indigo-400 dark:hover:border-indigo-800'
                     }`}
                   >
-                    {/* Thumbnail */}
-                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-905 flex-shrink-0 border border-slate-100 dark:border-slate-700">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 flex-shrink-0 border border-slate-100 dark:border-slate-700">
                       <img src={prodImg} alt="" className="w-full h-full object-cover" />
                     </div>
 
-                    {/* Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <h4 className={`font-black text-xs truncate ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                           {prod.title}
                         </h4>
                         <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                          prod.status === 'sold'
+                          prod.status === 'sold' || prod.is_sold
                             ? (isActive ? 'bg-indigo-700 text-white' : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400')
-                            : (isActive ? 'bg-indigo-500 text-white' : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-605 dark:text-emerald-400')
+                            : (isActive ? 'bg-indigo-500 text-white' : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400')
                         }`}>
-                          {prod.status}
+                          {prod.status === 'sold' || prod.is_sold ? 'Sold' : 'Active'}
                         </span>
                       </div>
-                      <p className={`text-[10px] font-bold ${isActive ? 'text-indigo-200' : 'text-indigo-650 dark:text-indigo-400'}`}>
+                      <p className={`text-[10px] font-bold ${isActive ? 'text-indigo-200' : 'text-indigo-600 dark:text-indigo-400'}`}>
                         ₹{prod.price}
                       </p>
-                      {prod.buyer_count > 0 && (
-                        <p className={`text-[9px] font-semibold mt-1 flex items-center ${isActive ? 'text-indigo-150' : 'text-slate-500 dark:text-slate-400'}`}>
-                          <MessageSquareText className="w-3 h-3 mr-1" />
-                          {prod.buyer_count} interested {prod.buyer_count === 1 ? 'buyer' : 'buyers'}
-                        </p>
-                      )}
                     </div>
                   </button>
                 );
@@ -338,7 +323,6 @@ export default function SellerDashboard() {
           </div>
         </div>
 
-        {/* User Footer Profile */}
         {currentUser && (
           <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/30 flex items-center space-x-2.5 overflow-hidden">
             <img src={currentUser.avatar} className="w-8 h-8 rounded-lg object-cover shadow-sm" alt="" />
@@ -365,17 +349,17 @@ export default function SellerDashboard() {
                     {selectedProduct.title}
                   </h1>
                   <div className="flex items-center space-x-2 mt-0.5">
-                    <span className="text-xs font-black text-indigo-650 dark:text-indigo-400">₹{selectedProduct.price}</span>
+                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">₹{selectedProduct.price}</span>
                     <span className="text-slate-350">•</span>
-                    <span className={`text-[10px] font-bold uppercase ${selectedProduct.status === 'sold' ? 'text-red-500' : 'text-emerald-500'}`}>
-                      {selectedProduct.status}
+                    <span className={`text-[10px] font-bold uppercase ${selectedProduct.status === 'sold' || selectedProduct.is_sold ? 'text-red-500' : 'text-emerald-500'}`}>
+                      {selectedProduct.status === 'sold' || selectedProduct.is_sold ? 'Sold' : 'Active'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              {selectedProduct.status !== 'sold' && selectedBuyerConv && (
+              {/* Mark As Sold Action */}
+              {selectedProduct.status !== 'sold' && !selectedProduct.is_sold && selectedBuyerConv && (
                 <button
                   onClick={handleMarkAsSold}
                   className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center justify-center transition-all flex-shrink-0"
@@ -385,9 +369,9 @@ export default function SellerDashboard() {
               )}
             </div>
 
-            {/* Switch Buyer Tab Row */}
+            {/* Buyers Row List */}
             {productBuyers.length > 1 && (
-              <div className="bg-slate-100/50 dark:bg-slate-900/40 border-b border-slate-200/50 dark:border-slate-800/50 px-4 py-2 flex items-center space-x-2 overflow-x-auto scrollbar-none">
+              <div className="bg-slate-100/50 dark:bg-slate-900/40 border-b border-slate-200/50 dark:border-slate-800/50 px-4 py-2 flex items-center space-x-2 overflow-x-auto">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mr-2 whitespace-nowrap">Buyers:</span>
                 {productBuyers.map(buyerConv => {
                   const isTabActive = selectedBuyerConv?.id === buyerConv.id;
@@ -398,7 +382,7 @@ export default function SellerDashboard() {
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                         isTabActive
                           ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-750 dark:hover:text-slate-200'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
                       }`}
                     >
                       {buyerConv.buyer.name}
@@ -409,10 +393,9 @@ export default function SellerDashboard() {
               </div>
             )}
 
-            {/* Chat Workspace */}
+            {/* Chat Workspace text render */}
             {selectedBuyerConv ? (
               <div className="flex-1 flex flex-col justify-between min-h-0">
-                {/* Message History */}
                 <div className="flex-1 p-5 overflow-y-auto space-y-4">
                   {isLoadingMessages ? (
                     <div className="h-full flex items-center justify-center text-xs text-slate-400 font-semibold animate-pulse">
@@ -424,9 +407,6 @@ export default function SellerDashboard() {
                       <p className="text-xs sm:text-sm font-bold text-slate-750 dark:text-slate-350">
                         Chat started with {selectedBuyerConv.buyer.name.split(' ')[0]}!
                       </p>
-                      <p className="text-[10px] text-slate-505 max-w-xs leading-relaxed">
-                        Reply to the student's inquiry, agree on a fair rate, and set a meeting location.
-                      </p>
                     </div>
                   ) : (
                     messages.map(msg => {
@@ -434,15 +414,12 @@ export default function SellerDashboard() {
                       const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                       return (
                         <div key={msg.id} className={`flex items-start space-x-3.5 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                          {/* Avatar */}
                           <img 
                             src={isMe ? currentUser.avatar : selectedBuyerConv.buyer.avatar} 
                             alt="" 
                             className="w-8.5 h-8.5 rounded-xl object-cover shadow-sm flex-shrink-0" 
                           />
-                          
                           <div className="max-w-[70%] space-y-0.5">
-                            {/* Name and time */}
                             <div className={`flex items-baseline space-x-2 text-[10px] ${isMe ? 'justify-end' : ''}`}>
                               <span className="font-extrabold text-slate-700 dark:text-slate-300">
                                 {isMe ? 'You' : selectedBuyerConv.buyer.name.split(' ')[0]}
@@ -451,7 +428,6 @@ export default function SellerDashboard() {
                                 {timeStr}
                               </span>
                             </div>
-                            {/* Body bubble */}
                             <div className={`p-3 rounded-2xl text-xs sm:text-sm shadow-sm leading-relaxed ${
                               isMe 
                                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-tr-none' 
@@ -467,24 +443,30 @@ export default function SellerDashboard() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Bar */}
-                <form onSubmit={handleSend} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder={`Reply to ${selectedBuyerConv.buyer.name.split(' ')[0]}...`}
-                    className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-850 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-750 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 dark:text-slate-100"
-                    disabled={isSending}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSending}
-                    className="p-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-md flex items-center justify-center transform scale-100 hover:scale-105 transition-all disabled:opacity-50"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
+                {/* Dynamic Input Bar (Hides if item is sold) */}
+                {selectedProduct.status === 'sold' || selectedProduct.is_sold ? (
+                  <div className="p-4 bg-red-50 dark:bg-red-950/20 border-t border-red-200 text-center text-xs font-bold text-red-600 dark:text-red-400">
+                    🔒 This listing is marked as sold. Chat interface is locked.
+                  </div>
+                ) : (
+                  <form onSubmit={handleSend} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      placeholder={`Reply to ${selectedBuyerConv.buyer.name.split(' ')[0]}...`}
+                      className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-850 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-750 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 dark:text-slate-100"
+                      disabled={isSending}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSending}
+                      className="p-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-md flex items-center justify-center transform scale-100 hover:scale-105 transition-all disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                )}
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 p-8 space-y-4">
@@ -492,29 +474,22 @@ export default function SellerDashboard() {
                   <MessageSquareText className="w-8 h-8" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-705 dark:text-slate-350">No Interested Buyers Yet</p>
-                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                    No student has messaged you about this item yet. You will be notified in real-time once someone expresses interest.
-                  </p>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-350">No Interested Buyers Yet</p>
                 </div>
               </div>
             )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-450 p-8 space-y-4">
+          <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 p-8 space-y-4">
             <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-indigo-500">
               <ShoppingBag className="w-8 h-8" />
             </div>
             <div>
               <p className="text-sm font-bold text-slate-700 dark:text-slate-350">No Listings Selected</p>
-              <p className="text-xs text-slate-505 mt-1">
-                Select a listed item from the left panel to review interested buyer chats.
-              </p>
             </div>
           </div>
         )}
       </div>
-
     </div>
   );
 }
