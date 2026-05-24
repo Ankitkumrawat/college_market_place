@@ -1,20 +1,40 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
+import axios from 'axios';
+import { API_URL } from '../../config';
 import { SlidersHorizontal, PackageOpen, Sparkles, TrendingUp, DollarSign } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import ProductCard from './ProductCard';
 
 export default function ProductGrid() {
   const { 
-    products, searchQuery, selectedCategory, 
+    products, setProducts, searchQuery, selectedCategory, 
     priceFilter, setPriceFilter,
     conditionFilter, setConditionFilter
   } = useApp();
 
+  // Fetch listed products on page load
+  useEffect(() => {
+    const fetchAllProducts = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/products`);
+        setProducts(response.data);
+      } catch (error) {
+        console.error("Failed to fetch products from backend:", error);
+        // Error is handled gracefully; UI falls back to previously cached/mock listings in state
+      }
+    };
+    fetchAllProducts();
+  }, [setProducts]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            product.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      const title = product.title || "";
+      const description = product.description || "";
+      const tags = product.tags || [];
+      
+      const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       const matchesPrice = product.price <= priceFilter;
       const matchesCondition = conditionFilter === 'All' || product.condition === conditionFilter;

@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { API_URL } from '../config';
 import { initialProducts, initialPosts, initialChats, aiStudyResources } from '../data/mockData';
 import { useAuth } from './AuthContext';
 
@@ -6,6 +8,7 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const { currentUser, verifyCurrentStudent } = useAuth();
+  const socketRef = useRef(null);
 
   // Fallback user if not logged in (for demo viewing)
   const defaultGuestUser = {
@@ -49,13 +52,34 @@ export const AppProvider = ({ children }) => {
   };
 
   // Products state
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('campus_products');
-    return saved ? JSON.parse(saved) : initialProducts;
-  });
+  const [products, setProducts] = useState(initialProducts);
 
+  const fetchProducts = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/products`);
+      setProducts(res.data);
+    } catch (err) {
+      console.error("Error fetching products from backend:", err);
+      // Fallback to local storage or mock data if backend is down
+      const saved = localStorage.getItem('campus_products');
+      if (saved) {
+        setProducts(JSON.parse(saved));
+      } else {
+        setProducts(initialProducts);
+      }
+    }
+  };
+
+  // Fetch products on mount
   useEffect(() => {
-    localStorage.setItem('campus_products', JSON.stringify(products));
+    fetchProducts();
+  }, []);
+
+  // Sync products state back to local storage as fallback
+  useEffect(() => {
+    if (products && products.length > 0 && products !== initialProducts) {
+      localStorage.setItem('campus_products', JSON.stringify(products));
+    }
   }, [products]);
 
   // Posts state
@@ -69,14 +93,94 @@ export const AppProvider = ({ children }) => {
   }, [posts]);
 
   // Chats state
-  const [chats, setChats] = useState(() => {
-    const saved = localStorage.getItem('campus_chats');
-    return saved ? JSON.parse(saved) : initialChats;
-  });
+  const [chats, setChats] = useState([]);
 
+  const fetchConversations = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await axios.get(`${API_URL}/api/chat/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChats(res.data);
+    } catch (err) {
+      console.error("Error fetching conversations:", err);
+      // Fallback to local storage
+      const saved = localStorage.getItem('campus_chats');
+      if (saved) {
+        setChats(JSON.parse(saved));
+      } else {
+        setChats([]);
+      }
+    }
+  };
+
+  // Fetch conversations when current user logs in
   useEffect(() => {
-    localStorage.setItem('campus_chats', JSON.stringify(chats));
+    if (currentUser) {
+      fetchConversations();
+    } else {
+      setChats([]);
+    }
+  }, [currentUser]);
+
+  // Sync chats state back to local storage as fallback
+  useEffect(() => {
+    if (chats && chats.length > 0) {
+      localStorage.setItem('campus_chats', JSON.stringify(chats));
+    }
   }, [chats]);
+
+  // WebSockets implementation for real-time delivery
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !currentUser) {
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      return;
+    }
+
+    let ws = null;
+    try {
+      // Translate HTTP API URL into WS URL
+      const wsHost = API_URL.replace(/^https?:\/\//, '');
+      const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${wsHost}/api/chat/ws/${token}`;
+      
+      ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // Sync conversation log in state
+          fetchConversations();
+          
+          // Trigger user alert if they received a message from someone else
+          if (data.sender_id !== currentUser.id) {
+            addNotification("New Message", data.text);
+          }
+        } catch (e) {
+          console.error("Failed to parse incoming WS text:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("Chat websocket connection closed.");
+      };
+
+    } catch (err) {
+      console.error("Websocket initialization failed:", err);
+    }
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [currentUser]);
 
   // Wishlist state
   const [wishlist, setWishlist] = useState(() => {
@@ -127,29 +231,33 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  const addProduct = (newProduct) => {
+  const addProduct = async (newProduct) => {
     if (!currentUser) {
       addNotification("Login Required", "Please login or register to list an item for sale.");
       return;
     }
-    const item = {
-      ...newProduct,
-      id: `p_${Date.now()}`,
-      seller: {
-        id: user.id,
-        name: user.name,
-        branch: user.branch,
-        year: user.year,
-        avatar: user.avatar,
-        isVerified: user.isVerified,
-        collegeEmail: user.email || user.collegeEmail,
-        rating: 5.0
-      },
-      createdAt: "Just now",
-      tags: newProduct.tags || ["CollegeItem"]
-    };
-    setProducts(prev => [item, ...prev]);
-    addNotification("Listing Created!", `Successfully listed "${item.title}" on the marketplace.`);
+
+    const token = localStorage.getItem('token');
+    try {
+      await axios.post(`${API_URL}/api/products`, {
+        title: newProduct.title,
+        price: newProduct.price,
+        original_price: newProduct.originalPrice,
+        condition: newProduct.condition,
+        category: newProduct.category,
+        image_url: newProduct.image,
+        description: newProduct.description,
+        tags: newProduct.tags
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      addNotification("Listing Created!", `Successfully listed "${newProduct.title}" on the marketplace.`);
+      fetchProducts(); // Refresh products from server
+    } catch (error) {
+      console.error("Error creating listing:", error);
+      addNotification("Listing Failed", "Could not publish your listing. Please try again.");
+    }
   };
 
   const addPost = (newPost) => {
@@ -165,7 +273,7 @@ export const AppProvider = ({ children }) => {
         branch: user.branch,
         year: user.year,
         avatar: user.avatar,
-        isVerified: user.isVerified
+        isVerified: user.is_verified || user.isVerified
       },
       upvotes: 1,
       comments: [],
@@ -209,58 +317,98 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  const startChatWithSeller = (product) => {
+  const startChatWithSeller = async (product) => {
     if (!currentUser) {
       addNotification("Login Required", "Please login or register to chat with sellers.");
       return;
     }
-    let existingChat = chats.find(c => c.product.title === product.title);
-    if (!existingChat) {
-      existingChat = {
-        id: `chat_${Date.now()}`,
-        user: product.seller,
-        product: { title: product.title, price: product.price },
-        lastMessage: `Hi! I'm interested in "${product.title}".`,
-        lastMessageTime: "Just now",
-        unread: false,
-        messages: [
-          { sender: "me", text: `Hi! I'm interested in "${product.title}" listed for ₹${product.price}.`, time: "Just now" },
-          { sender: "them", text: `Hello ${user.name}! Yes, it's available. When would you like to inspect it?`, time: "Just now" }
-        ]
-      };
-      setChats(prev => [existingChat, ...prev]);
+
+    const sellerId = product.seller.id;
+    const productId = product.id;
+
+    if (sellerId === currentUser.id) {
+      addNotification("Listing Owner", "You cannot start a chat with yourself.");
+      return;
     }
-    setActiveChatId(existingChat.id);
+
+    // Try finding existing chat locally in the loaded list
+    const existingChat = chats.find(c => 
+      c.user.id === sellerId && 
+      (!productId || !c.product || c.product.title === product.title)
+    );
+
+    if (existingChat) {
+      setActiveChatId(existingChat.id);
+    } else {
+      const token = localStorage.getItem('token');
+      try {
+        // Send first message to initialize conversation in database
+        const defaultText = `Hi! I'm interested in "${product.title}" listed for ₹${product.price}.`;
+        await axios.post(`${API_URL}/api/chat/messages`, {
+          receiver_id: sellerId,
+          product_id: typeof productId === 'number' ? productId : null,
+          text: defaultText
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        await fetchConversations();
+        
+        // Find and select the conversation
+        const updatedConversations = await axios.get(`${API_URL}/api/chat/conversations`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const newChat = updatedConversations.data.find(c => c.user.id === sellerId);
+        if (newChat) {
+          setActiveChatId(newChat.id);
+        }
+      } catch (err) {
+        console.error("Failed to initiate chat conversation:", err);
+      }
+    }
     setIsChatOpen(true);
     setSelectedProductModal(null);
   };
 
-  const sendMessage = (chatId, text) => {
-    setChats(prev => prev.map(chat => {
-      if (chat.id === chatId) {
-        const updatedMessages = [...chat.messages, { sender: "me", text, time: "Just now" }];
-        return { ...chat, messages: updatedMessages, lastMessage: text, lastMessageTime: "Just now" };
-      }
-      return chat;
-    }));
+  const sendMessage = async (chatId, text) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-    setTimeout(() => {
-      setChats(prev => prev.map(chat => {
-        if (chat.id === chatId) {
-          const replies = [
-            "Sure! Sounds good to me.",
-            "Let's coordinate over call or meet near the campus library.",
-            "Awesome. See you then!",
-            "I can bring it tomorrow morning during 1st lecture break."
-          ];
-          const replyText = replies[Math.floor(Math.random() * replies.length)];
-          const updatedMessages = [...chat.messages, { sender: "them", text: replyText, time: "Just now" }];
-          return { ...chat, messages: updatedMessages, lastMessage: replyText, lastMessageTime: "Just now", unread: true };
-        }
-        return chat;
-      }));
-      addNotification("New Chat Message", "You received a reply about your item inquiry.");
-    }, 1500);
+    // Parse partnerId and productId from chatId key format chat_{partnerId}_{productId}
+    const parts = chatId.replace('chat_', '').split('_');
+    const partnerId = parseInt(parts[0], 10);
+    const productId = parts[1] && parts[1] !== '0' ? parseInt(parts[1], 10) : null;
+
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      try {
+        socketRef.current.send(JSON.stringify({
+          receiver_id: partnerId,
+          product_id: productId,
+          text: text
+        }));
+      } catch (err) {
+        console.error("WS transmission error, fallback to REST:", err);
+        sendViaHttp(partnerId, productId, text, token);
+      }
+    } else {
+      sendViaHttp(partnerId, productId, text, token);
+    }
+  };
+
+  const sendViaHttp = async (receiverId, productId, text, token) => {
+    try {
+      await axios.post(`${API_URL}/api/chat/messages`, {
+        receiver_id: receiverId,
+        product_id: productId,
+        text: text
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchConversations();
+    } catch (err) {
+      console.error("HTTP fallback message transmission failed:", err);
+    }
   };
 
   const addNotification = (title, message) => {
@@ -287,9 +435,9 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       user, verifyStudent,
       isDarkMode, toggleTheme,
-      products, addProduct, reportItem,
+      products, setProducts, fetchProducts, addProduct, reportItem,
       posts, addPost, addComment, upvotePost,
-      chats, activeChatId, setActiveChatId, startChatWithSeller, sendMessage,
+      chats, setChats, fetchConversations, activeChatId, setActiveChatId, startChatWithSeller, sendMessage,
       wishlist, toggleWishlist,
       notifications, setNotifications,
       activeTab, setActiveTab,

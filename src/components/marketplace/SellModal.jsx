@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+import { API_URL } from '../../config';
 import { X, Upload, Sparkles, Check, DollarSign, Tag, Info } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export default function SellModal() {
-  const { isSellModalOpen, setIsSellModalOpen, addProduct } = useApp();
+  const { isSellModalOpen, setIsSellModalOpen, addProduct, fetchProducts } = useApp();
 
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -13,6 +15,7 @@ export default function SellModal() {
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [selectedPreset, setSelectedPreset] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Unsplash high quality presets for quick demo item creation
   const imagePresets = [
@@ -25,31 +28,61 @@ export default function SellModal() {
 
   if (!isSellModalOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title || !price) return;
-
+    
+    setIsSubmitting(true);
     const tagsArray = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
-    const newProduct = {
-      title,
-      price: Number(price),
-      originalPrice: originalPrice ? Number(originalPrice) : null,
-      category,
-      condition,
-      description: description || "No detailed description provided.",
-      image: imagePresets[selectedPreset].url,
-      tags: tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]
-    };
 
-    addProduct(newProduct);
-    setIsSellModalOpen(false);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert("Please register or log in first to create product listings.");
+        setIsSubmitting(false);
+        return;
+      }
 
-    // Reset form
-    setTitle('');
-    setPrice('');
-    setOriginalPrice('');
-    setDescription('');
-    setTagsInput('');
+      const productPayload = {
+        title,
+        price: Number(price),
+        original_price: originalPrice ? Number(originalPrice) : null,
+        condition,
+        category,
+        image_url: imagePresets[selectedPreset].url,
+        description: description || "No detailed description provided.",
+        tags: tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]
+      };
+
+      // Perform POST request to FastAPI endpoint
+      await axios.post(`${API_URL}/api/products`, productPayload, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      // Synchronize list in parent context
+      if (fetchProducts) {
+        await fetchProducts();
+      } else if (addProduct) {
+        // Fallback to update state locally
+        addProduct(productPayload);
+      }
+
+      setIsSellModalOpen(false);
+
+      // Reset form fields
+      setTitle('');
+      setPrice('');
+      setOriginalPrice('');
+      setDescription('');
+      setTagsInput('');
+    } catch (error) {
+      console.error("Error uploading listing to backend:", error);
+      alert(error.response?.data?.detail || "Could not publish your listing. Please verify your connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const categories = ["Notes", "Calculators", "Engineering tools", "Lab equipment", "Books", "Electronics", "Hostel essentials", "Study materials"];
@@ -214,14 +247,21 @@ export default function SellModal() {
               type="button"
               onClick={() => setIsSellModalOpen(false)}
               className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-extrabold text-sm shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200"
+              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-extrabold text-sm shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 flex items-center"
+              disabled={isSubmitting}
             >
-              Publish Listing
+              {isSubmitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                  Publishing...
+                </>
+              ) : "Publish Listing"}
             </button>
           </div>
 

@@ -1,148 +1,135 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import { API_URL } from '../config';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Default sample users for initial testing
-  const defaultUsers = [
-    {
-      id: "u1",
-      name: "Ankit Kumrawat",
-      email: "ankit.cse@college.edu",
-      password: "password123",
-      branch: "Computer Science Engg.",
-      year: "3rd Year",
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
-      isVerified: true,
-      collegeId: "COL-2024-8891"
-    },
-    {
-      id: "u2",
-      name: "Aarav Sharma",
-      email: "aarav.cs22@college.edu",
-      password: "password123",
-      branch: "Computer Science",
-      year: "4th Year (Senior)",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-      isVerified: true,
-      collegeId: "COL-2022-1042"
-    },
-    {
-      id: "u3",
-      name: "Priya Patel",
-      email: "priya.ece@college.edu",
-      password: "password123",
-      branch: "Electronics",
-      year: "3rd Year",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
-      isVerified: true,
-      collegeId: "COL-2024-4112"
-    }
-  ];
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Retrieve or initialize registered users
-  const [users, setUsers] = useState(() => {
-    const saved = localStorage.getItem('campus_registered_users');
-    return saved ? JSON.parse(saved) : defaultUsers;
-  });
-
+  // Check if user is logged in on mount
   useEffect(() => {
-    localStorage.setItem('campus_registered_users', JSON.stringify(users));
-  }, [users]);
+    const checkLoggedIn = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const response = await axios.get(`${API_URL}/api/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          setCurrentUser(response.data);
+        } catch (error) {
+          console.error("Token verification failed, logging out:", error);
+          localStorage.removeItem('token');
+          setCurrentUser(null);
+        }
+      }
+      setLoading(false);
+    };
+    checkLoggedIn();
+  }, []);
 
-  // Retrieve or initialize currentUser (Default to null if none saved)
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('campus_current_user');
-    if (saved !== null) {
-      return JSON.parse(saved);
+  const parseErrorMessage = (error, defaultMsg) => {
+    if (error.response?.data?.detail) {
+      const detail = error.response.data.detail;
+      if (Array.isArray(detail)) {
+        return detail.map(err => err.msg || JSON.stringify(err)).join(', ');
+      }
+      return detail;
     }
-    return null;
-  });
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('campus_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('campus_current_user');
-    }
-  }, [currentUser]);
+    return defaultMsg;
+  };
 
   // Login function
-  const login = (email, password) => {
-    const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!foundUser) {
-      return { success: false, message: 'No account found with this email address.' };
+  const login = async (email, password) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/login`, {
+        email,
+        password
+      });
+      const { access_token } = response.data;
+      localStorage.setItem('token', access_token);
+
+      // Fetch user profile immediately
+      const profileResponse = await axios.get(`${API_URL}/api/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${access_token}`
+        }
+      });
+      
+      setCurrentUser(profileResponse.data);
+      return { success: true, message: `Welcome back, ${profileResponse.data.name}!` };
+    } catch (error) {
+      const errorMsg = parseErrorMessage(error, 'Incorrect password or no account found with this email.');
+      return { success: false, message: errorMsg };
     }
-    if (foundUser.password !== password) {
-      return { success: false, message: 'Incorrect password. Please try again.' };
-    }
-    setCurrentUser(foundUser);
-    return { success: true, message: `Welcome back, ${foundUser.name}!` };
   };
 
   // Register function
-  const register = (name, email, password, branch, year) => {
-    const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      return { success: false, message: 'An account with this email already exists.' };
+  const register = async (name, email, password, branch, year) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/register`, {
+        name,
+        email,
+        password,
+        branch,
+        year,
+        avatar: "", // Handled server-side if blank
+        college_id: "" // Handled server-side if blank
+      });
+      const { access_token } = response.data;
+      localStorage.setItem('token', access_token);
+
+      // Fetch user profile
+      const profileResponse = await axios.get(`${API_URL}/api/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${access_token}`
+        }
+      });
+      
+      setCurrentUser(profileResponse.data);
+      return { 
+        success: true, 
+        message: `Account created successfully! ${profileResponse.data.is_verified ? 'Student email verified.' : ''}` 
+      };
+    } catch (error) {
+      const errorMsg = parseErrorMessage(error, 'Registration failed. Check details or email domain.');
+      return { success: false, message: errorMsg };
     }
-
-    const isEdu = email.endsWith('.edu') || email.endsWith('.ac.in');
-    const avatarList = [
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80"
-    ];
-    const randomAvatar = avatarList[Math.floor(Math.random() * avatarList.length)];
-
-    const newUser = {
-      id: `u_${Date.now()}`,
-      name,
-      email,
-      password,
-      branch,
-      year,
-      avatar: randomAvatar,
-      isVerified: isEdu,
-      collegeId: `COL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
-    };
-
-    setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
-    return { success: true, message: `Account created successfully! ${isEdu ? 'Student email verified.' : ''}` };
   };
 
   // Logout function
   const logout = () => {
+    localStorage.removeItem('token');
     setCurrentUser(null);
-    localStorage.removeItem('campus_current_user');
     return { success: true, message: 'Logged out successfully.' };
   };
 
-  // Update verification status
-  const verifyCurrentStudent = (email) => {
+  // Simple compatibility placeholder for manual verify student verification
+  const verifyCurrentStudent = async (email) => {
     if (!currentUser) return false;
-    if (email && (email.endsWith('.edu') || email.endsWith('.ac.in'))) {
-      const updated = { ...currentUser, isVerified: true, email };
-      setCurrentUser(updated);
-      setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+    try {
+      const updatedUser = { ...currentUser, is_verified: true, email };
+      setCurrentUser(updatedUser);
       return true;
+    } catch (error) {
+      console.error("Verification failed:", error);
+      return false;
     }
-    return false;
   };
 
   return (
     <AuthContext.Provider value={{
       currentUser,
-      users,
+      loading,
       login,
       register,
       logout,
       verifyCurrentStudent
     }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

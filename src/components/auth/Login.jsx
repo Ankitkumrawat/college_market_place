@@ -13,7 +13,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -23,14 +23,18 @@ export default function Login() {
       return;
     }
 
-    const result = login(email, password);
-    if (result.success) {
-      setSuccess(result.message);
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
-    } else {
-      setError(result.message);
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        setSuccess(result.message);
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError("Login request failed. Please check your connection.");
     }
   };
 

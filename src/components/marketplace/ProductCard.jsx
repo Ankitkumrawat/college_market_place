@@ -15,7 +15,14 @@ export default function ProductCard({ product }) {
     }
   };
 
-  const savings = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+  // Safe mapping between Camel Case (mockup) and Snake Case (backend SQL database schema)
+  const originalPrice = product.original_price !== undefined ? product.original_price : product.originalPrice;
+  const imageUrl = product.image_url || product.image;
+  const isSellerVerified = product.seller 
+    ? (product.seller.is_verified !== undefined ? product.seller.is_verified : product.seller.isVerified)
+    : false;
+
+  const savings = originalPrice ? Math.round(((originalPrice - product.price) / originalPrice) * 100) : 0;
 
   return (
     <div className="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative transform hover:-translate-y-1.5">
@@ -23,7 +30,7 @@ export default function ProductCard({ product }) {
       {/* Product Image & Badges Container */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-slate-900 cursor-pointer" onClick={() => setSelectedProductModal(product)}>
         <img 
-          src={product.image} 
+          src={imageUrl} 
           alt={product.title} 
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
@@ -81,40 +88,42 @@ export default function ProductCard({ product }) {
             <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
               ₹{product.price}
             </span>
-            {product.originalPrice && product.originalPrice > product.price && (
+            {originalPrice && originalPrice > product.price && (
               <span className="text-sm font-medium text-slate-400 line-through">
-                ₹{product.originalPrice}
+                ₹{originalPrice}
               </span>
             )}
           </div>
 
           {/* Seller Information */}
-          <div className="flex items-center justify-between py-3 px-3.5 bg-slate-50 dark:bg-slate-700/40 rounded-2xl border border-slate-100 dark:border-slate-700/60 mb-4">
-            <div className="flex items-center space-x-2.5 overflow-hidden">
-              <div className="relative flex-shrink-0">
-                <img src={product.seller.avatar} alt={product.seller.name} className="w-8 h-8 rounded-xl object-cover" />
-                {product.seller.isVerified && (
-                  <div className="absolute -bottom-1 -right-1 p-0.5 bg-emerald-500 text-white rounded-full ring-2 ring-white dark:ring-slate-800" title="Verified Student">
-                    <ShieldCheck className="w-2.5 h-2.5" />
-                  </div>
-                )}
+          {product.seller && (
+            <div className="flex items-center justify-between py-3 px-3.5 bg-slate-50 dark:bg-slate-700/40 rounded-2xl border border-slate-100 dark:border-slate-700/60 mb-4">
+              <div className="flex items-center space-x-2.5 overflow-hidden">
+                <div className="relative flex-shrink-0">
+                  <img src={product.seller.avatar} alt={product.seller.name} className="w-8 h-8 rounded-xl object-cover" />
+                  {isSellerVerified && (
+                    <div className="absolute -bottom-1 -right-1 p-0.5 bg-emerald-500 text-white rounded-full ring-2 ring-white dark:ring-slate-800" title="Verified Student">
+                      <ShieldCheck className="w-2.5 h-2.5" />
+                    </div>
+                  )}
+                </div>
+                <div className="truncate">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex items-center">
+                    {product.seller.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                    {product.seller.branch} • {product.seller.year}
+                  </p>
+                </div>
               </div>
-              <div className="truncate">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex items-center">
-                  {product.seller.name}
-                </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                  {product.seller.branch} • {product.seller.year}
-                </p>
-              </div>
+              {product.seller.rating && (
+                <div className="flex items-center bg-white dark:bg-slate-800 px-2 py-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 flex-shrink-0">
+                  <Star className="w-3 h-3 text-amber-500 fill-amber-500 mr-1" />
+                  <span className="text-xs font-bold">{product.seller.rating}</span>
+                </div>
+              )}
             </div>
-            {product.seller.rating && (
-              <div className="flex items-center bg-white dark:bg-slate-800 px-2 py-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 flex-shrink-0">
-                <Star className="w-3 h-3 text-amber-500 fill-amber-500 mr-1" />
-                <span className="text-xs font-bold">{product.seller.rating}</span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Card Actions */}

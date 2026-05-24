@@ -36,7 +36,7 @@ export default function Register() {
     'Alumni / Faculty'
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -51,14 +51,18 @@ export default function Register() {
       return;
     }
 
-    const result = register(name, email, password, branch, year);
-    if (result.success) {
-      setSuccess(result.message);
-      setTimeout(() => {
-        navigate('/');
-      }, 1200);
-    } else {
-      setError(result.message);
+    try {
+      const result = await register(name, email, password, branch, year);
+      if (result.success) {
+        setSuccess(result.message);
+        setTimeout(() => {
+          navigate('/');
+        }, 1200);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError("Registration request failed. Please check your connection.");
     }
   };
 
@@ -127,7 +131,7 @@ export default function Register() {
                 required
               />
             </div>
-            {email && (email.endsWith('.edu') || email.endsWith('.ac.in')) && (
+            {email && email.includes('@') && (
               <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center mt-1">
                 <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Eligible for auto-verified student badge!
               </span>

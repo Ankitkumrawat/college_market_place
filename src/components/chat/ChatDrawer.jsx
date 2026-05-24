@@ -13,8 +13,17 @@ export default function ChatDrawer() {
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText || !inputText.trim() || !activeChat) return;
-    sendMessage(activeChat.id, inputText);
+    sendMessage(activeChat.id, inputText.trim());
     setInputText('');
+  };
+
+  const getPartnerAvatar = (chatUser) => {
+    return chatUser?.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80";
+  };
+
+  const isUserVerified = (chatUser) => {
+    if (!chatUser) return false;
+    return chatUser.is_verified !== undefined ? chatUser.is_verified : chatUser.isVerified;
   };
 
   return (
@@ -54,8 +63,8 @@ export default function ChatDrawer() {
                   : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
               }`}
             >
-              <img src={chat.user.avatar} className="w-5 h-5 rounded-full object-cover" alt="" />
-              <span>{chat.user.name.split(' ')[0]}</span>
+              <img src={getPartnerAvatar(chat.user)} className="w-5 h-5 rounded-full object-cover" alt="" />
+              <span>{chat.user?.name ? chat.user.name.split(' ')[0] : 'Student'}</span>
               {chat.unread && <span className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span>}
             </button>
           ))}
@@ -67,40 +76,50 @@ export default function ChatDrawer() {
             {/* Active User Info Banner */}
             <div className="p-3 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <img src={activeChat.user.avatar} alt={activeChat.user.name} className="w-10 h-10 rounded-2xl object-cover shadow-sm" />
+                <img src={getPartnerAvatar(activeChat.user)} alt={activeChat.user?.name} className="w-10 h-10 rounded-2xl object-cover shadow-sm" />
                 <div className="text-xs">
                   <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center">
-                    {activeChat.user.name}
-                    {activeChat.user.isVerified && <ShieldCheck className="w-3.5 h-3.5 ml-1 text-emerald-500" title="Verified" />}
+                    {activeChat.user?.name || 'Student'}
+                    {isUserVerified(activeChat.user) && <ShieldCheck className="w-3.5 h-3.5 ml-1 text-emerald-500" title="Verified" />}
                   </p>
-                  <p className="text-slate-500 text-[10px]">{activeChat.user.branch} • {activeChat.user.year}</p>
+                  <p className="text-slate-500 text-[10px]">
+                    {activeChat.user?.branch || 'Branch'} • {activeChat.user?.year || 'Batch'}
+                  </p>
                 </div>
               </div>
-              <div className="text-right text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-xl font-extrabold border border-indigo-200 dark:border-indigo-800">
-                Item: ₹{activeChat.product.price}
-              </div>
+              {activeChat.product && (
+                <div className="text-right text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-xl font-extrabold border border-indigo-200 dark:border-indigo-800 max-w-[150px] truncate" title={activeChat.product.title}>
+                  ₹{activeChat.product.price} • {activeChat.product.title}
+                </div>
+              )}
             </div>
 
             {/* Message History */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-slate-950/60">
-              {activeChat.messages.map((msg, index) => {
-                const isMe = msg.sender === 'me';
-                return (
-                  <div key={index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    <div className="flex items-end space-x-1.5 max-w-[80%]">
-                      {!isMe && <img src={activeChat.user.avatar} className="w-6 h-6 rounded-full object-cover mb-1" alt="" />}
-                      <div className={`p-3.5 rounded-2xl text-xs sm:text-sm font-medium shadow-sm leading-relaxed ${
-                        isMe 
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none' 
-                          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-none'
-                      }`}>
-                        {msg.text}
+              {activeChat.messages && activeChat.messages.length > 0 ? (
+                activeChat.messages.map((msg, index) => {
+                  const isMe = msg.sender === 'me';
+                  return (
+                    <div key={index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-end space-x-1.5 max-w-[80%]">
+                        {!isMe && <img src={getPartnerAvatar(activeChat.user)} className="w-6 h-6 rounded-full object-cover mb-1" alt="" />}
+                        <div className={`p-3.5 rounded-2xl text-xs sm:text-sm font-medium shadow-sm leading-relaxed ${
+                          isMe 
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none' 
+                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-none'
+                        }`}>
+                          {msg.text}
+                        </div>
                       </div>
+                      <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.time}</span>
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.time}</span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  No messages yet. Send a message to start the conversation!
+                </div>
+              )}
             </div>
 
             {/* Input Bar */}
@@ -109,7 +128,7 @@ export default function ChatDrawer() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={`Reply to ${activeChat.user.name.split(' ')[0]}...`}
+                placeholder={activeChat.user?.name ? `Reply to ${activeChat.user.name.split(' ')[0]}...` : 'Type a message...'}
                 className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
               />
               <button
