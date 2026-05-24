@@ -79,6 +79,37 @@ export const AuthProvider = ({ children }) => {
         avatar: "", // Handled server-side if blank
         college_id: "" // Handled server-side if blank
       });
+      
+      const { access_token } = response.data;
+      if (access_token) {
+        localStorage.setItem('token', access_token);
+        
+        // Fetch user profile immediately
+        const profileResponse = await axios.get(`${API_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${access_token}`
+          }
+        });
+        setCurrentUser(profileResponse.data);
+      }
+
+      return { 
+        success: true, 
+        message: response.data.message || "Registration successful! Logging you in..."
+      };
+    } catch (error) {
+      const errorMsg = parseErrorMessage(error, 'Registration failed. Check details or email domain.');
+      return { success: false, message: errorMsg };
+    }
+  };
+
+  // Verify OTP function
+  const verifyOtp = async (email, otp) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/verify-otp`, {
+        email,
+        otp
+      });
       const { access_token } = response.data;
       localStorage.setItem('token', access_token);
 
@@ -92,10 +123,10 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(profileResponse.data);
       return { 
         success: true, 
-        message: `Account created successfully! ${profileResponse.data.is_verified ? 'Student email verified.' : ''}` 
+        message: `OTP verified successfully! Welcome, ${profileResponse.data.name}.` 
       };
     } catch (error) {
-      const errorMsg = parseErrorMessage(error, 'Registration failed. Check details or email domain.');
+      const errorMsg = parseErrorMessage(error, 'OTP verification failed. Check the code and try again.');
       return { success: false, message: errorMsg };
     }
   };
@@ -126,6 +157,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       register,
+      verifyOtp,
       logout,
       verifyCurrentStudent
     }}>

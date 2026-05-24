@@ -124,6 +124,56 @@ export default function Navbar() {
                 <Sparkles className="w-4 h-4 mr-1.5 text-amber-300 animate-spin" style={{ animationDuration: '6s' }} />
                 AI Smart Match
               </button>
+              <Link
+                to="/chat"
+                className={`flex items-center px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+                  location.pathname === '/chat'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white'
+                }`}
+              >
+                <MessageSquareText className="w-4 h-4 mr-1.5" />
+                Community Chat
+              </Link>
+              {currentUser && (
+                <Link
+                  to="/buyer-dashboard"
+                  className={`flex items-center px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+                    location.pathname === '/buyer-dashboard'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white'
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4 mr-1.5" />
+                  Buying Dashboard
+                </Link>
+              )}
+              {currentUser && (
+                <Link
+                  to="/seller-dashboard"
+                  className={`flex items-center px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+                    location.pathname === '/seller-dashboard'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white'
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4 mr-1.5" />
+                  Selling Dashboard
+                </Link>
+              )}
+              {currentUser && currentUser.role === 'admin' && (
+                <Link
+                  to="/admin"
+                  className={`flex items-center px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+                    location.pathname === '/admin'
+                      ? 'bg-red-550 text-white shadow-sm shadow-red-500/20'
+                      : 'text-red-650 dark:text-red-450 hover:bg-red-50 dark:hover:bg-red-950/20'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 mr-1.5" />
+                  Admin Control
+                </Link>
+              )}
             </nav>
 
             {/* Sell Button */}
@@ -313,6 +363,40 @@ export default function Navbar() {
             >
               <Sparkles className="w-5 h-5 mr-3 text-amber-500" /> AI Smart Match
             </button>
+            <Link
+              to="/chat"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center py-2.5 px-4 rounded-xl text-sm font-semibold ${location.pathname === '/chat' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300'}`}
+            >
+              <MessageSquareText className="w-5 h-5 mr-3" /> Community Chat
+            </Link>
+            {currentUser && (
+              <Link
+                to="/buyer-dashboard"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center py-2.5 px-4 rounded-xl text-sm font-semibold ${location.pathname === '/buyer-dashboard' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                <ShoppingBag className="w-5 h-5 mr-3" /> Buying Dashboard
+              </Link>
+            )}
+            {currentUser && (
+              <Link
+                to="/seller-dashboard"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center py-2.5 px-4 rounded-xl text-sm font-semibold ${location.pathname === '/seller-dashboard' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                <ShoppingBag className="w-5 h-5 mr-3" /> Selling Dashboard
+              </Link>
+            )}
+            {currentUser && currentUser.role === 'admin' && (
+              <Link
+                to="/admin"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center py-2.5 px-4 rounded-xl text-sm font-semibold ${location.pathname === '/admin' ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'text-red-650 dark:text-red-450'}`}
+              >
+                <ShieldCheck className="w-5 h-5 mr-3" /> Admin Control
+              </Link>
+            )}
           </div>
           
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">

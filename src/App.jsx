@@ -16,6 +16,10 @@ import VerifyModal from './components/auth/VerifyModal';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AdminPanel from './components/admin/AdminPanel';
+import Chat from './components/chat/Chat';
+import BuyerDashboard from './components/dashboard/BuyerDashboard';
+import SellerDashboard from './components/dashboard/SellerDashboard';
 
 function CampusHome() {
   const { activeTab } = useApp();
@@ -67,6 +71,46 @@ export default function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <CampusHome />
+                </MainLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AdminPanel />
+                </MainLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Chat />
+                </MainLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/buyer-dashboard" 
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <BuyerDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/seller-dashboard" 
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <SellerDashboard />
                 </MainLayout>
               </ProtectedRoute>
             } 

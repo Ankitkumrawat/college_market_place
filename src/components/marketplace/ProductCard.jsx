@@ -1,10 +1,13 @@
 import React from 'react';
-import { Heart, MessageSquareText, ShieldCheck, Tag, Star, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Heart, MessageSquareText, ShieldCheck, Tag, Star, Sparkles, ShoppingBag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { API_URL } from '../../config';
 
 export default function ProductCard({ product }) {
-  const { wishlist, toggleWishlist, setSelectedProductModal, startChatWithSeller } = useApp();
+  const { wishlist, toggleWishlist, setSelectedProductModal, startChatWithSeller, expressInterestOrBuy } = useApp();
   const isWishlisted = wishlist.includes(product.id);
+  const navigate = useNavigate();
 
   const getConditionColor = (cond) => {
     switch (cond) {
@@ -17,7 +20,10 @@ export default function ProductCard({ product }) {
 
   // Safe mapping between Camel Case (mockup) and Snake Case (backend SQL database schema)
   const originalPrice = product.original_price !== undefined ? product.original_price : product.originalPrice;
-  const imageUrl = product.image_url || product.image;
+  const rawImage = product.image_url || product.image;
+  const imageUrl = rawImage && (rawImage.startsWith('http') || rawImage.startsWith('data:') || rawImage.startsWith('blob:'))
+    ? rawImage 
+    : (rawImage ? `${API_URL}/${rawImage}` : '');
   const isSellerVerified = product.seller 
     ? (product.seller.is_verified !== undefined ? product.seller.is_verified : product.seller.isVerified)
     : false;
@@ -135,10 +141,15 @@ export default function ProductCard({ product }) {
             View Details
           </button>
           <button 
-            onClick={() => startChatWithSeller(product)} 
+            onClick={async () => {
+              const res = await expressInterestOrBuy(product.id);
+              if (res && res.success) {
+                navigate('/buyer-dashboard');
+              }
+            }} 
             className="w-full py-2.5 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all duration-200"
           >
-            <MessageSquareText className="w-3.5 h-3.5 mr-1.5" /> Chat Seller
+            <ShoppingBag className="w-3.5 h-3.5 mr-1.5" /> Buy / Chat
           </button>
         </div>
 

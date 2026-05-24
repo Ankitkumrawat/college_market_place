@@ -239,17 +239,33 @@ export const AppProvider = ({ children }) => {
 
     const token = localStorage.getItem('token');
     try {
-      await axios.post(`${API_URL}/api/products`, {
-        title: newProduct.title,
-        price: newProduct.price,
-        original_price: newProduct.originalPrice,
-        condition: newProduct.condition,
-        category: newProduct.category,
-        image_url: newProduct.image,
-        description: newProduct.description,
-        tags: newProduct.tags
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      const formData = new FormData();
+      formData.append('title', newProduct.title);
+      formData.append('price', Number(newProduct.price));
+      if (newProduct.originalPrice) {
+        formData.append('original_price', Number(newProduct.originalPrice));
+      }
+      formData.append('condition', newProduct.condition);
+      formData.append('category', newProduct.category);
+      formData.append('description', newProduct.description || "No detailed description provided.");
+      formData.append('tags', JSON.stringify(newProduct.tags || []));
+
+      // Handle image file or URL preset
+      if (newProduct.imageFile) {
+        formData.append('image', newProduct.imageFile);
+      } else if (newProduct.image) {
+        // If it's a URL (preset), fetch and convert it to a file
+        const response = await fetch(newProduct.image);
+        const blob = await response.blob();
+        const file = new File([blob], 'preset.jpg', { type: 'image/jpeg' });
+        formData.append('image', file);
+      }
+
+      await axios.post(`${API_URL}/api/products`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       addNotification("Listing Created!", `Successfully listed "${newProduct.title}" on the marketplace.`);
@@ -269,6 +285,7 @@ export const AppProvider = ({ children }) => {
       ...newPost,
       id: `post_${Date.now()}`,
       author: {
+        id: user.id,
         name: user.name,
         branch: user.branch,
         year: user.year,
@@ -320,55 +337,68 @@ export const AppProvider = ({ children }) => {
   const startChatWithSeller = async (product) => {
     if (!currentUser) {
       addNotification("Login Required", "Please login or register to chat with sellers.");
-      return;
+      return { success: false };
     }
 
     const sellerId = product.seller.id;
-    const productId = product.id;
-
     if (sellerId === currentUser.id) {
       addNotification("Listing Owner", "You cannot start a chat with yourself.");
-      return;
+      return { success: false };
     }
 
-    // Try finding existing chat locally in the loaded list
-    const existingChat = chats.find(c => 
-      c.user.id === sellerId && 
-      (!productId || !c.product || c.product.title === product.title)
-    );
-
-    if (existingChat) {
-      setActiveChatId(existingChat.id);
-    } else {
-      const token = localStorage.getItem('token');
-      try {
-        // Send first message to initialize conversation in database
-        const defaultText = `Hi! I'm interested in "${product.title}" listed for ₹${product.price}.`;
-        await axios.post(`${API_URL}/api/chat/messages`, {
-          receiver_id: sellerId,
-          product_id: typeof productId === 'number' ? productId : null,
-          text: defaultText
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        await fetchConversations();
-        
-        // Find and select the conversation
-        const updatedConversations = await axios.get(`${API_URL}/api/chat/conversations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        const newChat = updatedConversations.data.find(c => c.user.id === sellerId);
-        if (newChat) {
-          setActiveChatId(newChat.id);
-        }
-      } catch (err) {
-        console.error("Failed to initiate chat conversation:", err);
-      }
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(`${API_URL}/api/chat/conversations`, {
+        product_id: product.id
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return { success: true, conversation: res.data };
+    } catch (err) {
+      console.error("Failed to start conversation:", err);
+      addNotification("Error", err.response?.data?.detail || "Could not start chat.");
+      return { success: false };
     }
-    setIsChatOpen(true);
-    setSelectedProductModal(null);
+  };
+
+  const expressInterestOrBuy = async (productId) => {
+    if (!currentUser) {
+      addNotification("Login Required", "Please login or register to express interest in items.");
+      return { success: false };
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(`${API_URL}/api/products/${productId}/buy`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addNotification("Interest Registered!", "You have expressed interest in this product. Private chat initiated!");
+      return { success: true, conversation: res.data };
+    } catch (err) {
+      console.error("Failed to express interest:", err);
+      addNotification("Error", err.response?.data?.detail || "Could not complete action.");
+      return { success: false };
+    }
+  };
+
+  const markProductAsSold = async (productId, buyerId = null) => {
+    if (!currentUser) return { success: false };
+    const token = localStorage.getItem('token');
+    try {
+      const url = buyerId 
+        ? `${API_URL}/api/products/${productId}/sold?buyer_id=${buyerId}`
+        : `${API_URL}/api/products/${productId}/sold`;
+      const res = await axios.put(url, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      addNotification("Item Sold!", "The listing status has been updated to Sold.");
+      fetchProducts(); // Refresh products list
+      return { success: true, product: res.data };
+    } catch (err) {
+      console.error("Failed to mark item as sold:", err);
+      addNotification("Error", err.response?.data?.detail || "Could not update item status.");
+      return { success: false };
+    }
   };
 
   const sendMessage = async (chatId, text) => {
@@ -437,7 +467,7 @@ export const AppProvider = ({ children }) => {
       isDarkMode, toggleTheme,
       products, setProducts, fetchProducts, addProduct, reportItem,
       posts, addPost, addComment, upvotePost,
-      chats, setChats, fetchConversations, activeChatId, setActiveChatId, startChatWithSeller, sendMessage,
+      chats, setChats, fetchConversations, activeChatId, setActiveChatId, startChatWithSeller, expressInterestOrBuy, markProductAsSold, sendMessage,
       wishlist, toggleWishlist,
       notifications, setNotifications,
       activeTab, setActiveTab,

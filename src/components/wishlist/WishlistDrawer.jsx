@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Heart, Trash2, ArrowRight, MessageSquareText, ShoppingBag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { API_URL } from '../../config';
 
 export default function WishlistDrawer() {
   const { isWishlistOpen, setIsWishlistOpen, wishlist, toggleWishlist, products, setSelectedProductModal, startChatWithSeller } = useApp();
@@ -41,44 +42,50 @@ export default function WishlistDrawer() {
               <p className="text-xs mt-1 text-slate-500">Explore the marketplace and click the heart icon on any product to save it here.</p>
             </div>
           ) : (
-            savedItems.map(item => (
-              <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between space-x-3 group hover:shadow transition-shadow">
-                <img 
-                  src={item.image} 
-                  alt={item.title} 
-                  className="w-16 h-16 rounded-xl object-cover cursor-pointer flex-shrink-0" 
-                  onClick={() => { setSelectedProductModal(item); setIsWishlistOpen(false); }}
-                />
-                
-                <div className="flex-1 min-w-0">
-                  <h4 
+            savedItems.map(item => {
+              const rawImage = item.image_url || item.image;
+              const imageUrl = rawImage && (rawImage.startsWith('http') || rawImage.startsWith('data:') || rawImage.startsWith('blob:'))
+                ? rawImage 
+                : (rawImage ? `${API_URL}/${rawImage}` : '');
+              return (
+                <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between space-x-3 group hover:shadow transition-shadow">
+                  <img 
+                    src={imageUrl} 
+                    alt={item.title} 
+                    className="w-16 h-16 rounded-xl object-cover cursor-pointer flex-shrink-0" 
                     onClick={() => { setSelectedProductModal(item); setIsWishlistOpen(false); }}
-                    className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
-                  >
-                    {item.title}
-                  </h4>
-                  <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">₹{item.price}</p>
-                  <p className="text-[10px] text-slate-400 mt-1 truncate">Seller: {item.seller.name}</p>
-                </div>
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <h4 
+                      onClick={() => { setSelectedProductModal(item); setIsWishlistOpen(false); }}
+                      className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                    >
+                      {item.title}
+                    </h4>
+                    <p className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">₹{item.price}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 truncate">Seller: {item.seller.name}</p>
+                  </div>
 
-                <div className="flex items-center space-x-1.5 flex-shrink-0">
-                  <button
-                    onClick={() => { startChatWithSeller(item); setIsWishlistOpen(false); }}
-                    className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors"
-                    title="Chat with Seller"
-                  >
-                    <MessageSquareText className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => toggleWishlist(item.id)}
-                    className="p-2 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
-                    title="Remove from wishlist"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => { startChatWithSeller(item); setIsWishlistOpen(false); }}
+                      className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors"
+                      title="Chat with Seller"
+                    >
+                      <MessageSquareText className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => toggleWishlist(item.id)}
+                      className="p-2 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+                      title="Remove from wishlist"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

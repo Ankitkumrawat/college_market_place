@@ -4,7 +4,7 @@ import { GraduationCap, User, Mail, Lock, BookOpen, Calendar, Eye, EyeOff, Alert
 import { useAuth } from '../../context/AuthContext';
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, verifyOtp } = useAuth();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -15,6 +15,9 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const branches = [
     'Computer Science Engg.',
@@ -55,14 +58,50 @@ export default function Register() {
       const result = await register(name, email, password, branch, year);
       if (result.success) {
         setSuccess(result.message);
-        setTimeout(() => {
-          navigate('/');
-        }, 1200);
+        if (result.requires_otp) {
+          setTimeout(() => {
+            setSuccess('');
+            setShowOtpScreen(true);
+          }, 1500);
+        } else {
+          setTimeout(() => {
+            setSuccess('');
+            navigate('/');
+          }, 1500);
+        }
       } else {
         setError(result.message);
       }
     } catch (err) {
       setError("Registration request failed. Please check your connection.");
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!otp || otp.length !== 6) {
+      setError('Please enter the 6-digit OTP code.');
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const result = await verifyOtp(email, otp);
+      if (result.success) {
+        setSuccess(result.message);
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError("OTP Verification failed. Please check your connection.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -79,9 +118,13 @@ export default function Register() {
           <Link to="/" className="inline-flex p-3 bg-gradient-to-tr from-purple-600 to-pink-600 rounded-2xl shadow-lg shadow-purple-500/30 text-white transform hover:-rotate-6 transition-transform duration-200 mx-auto">
             <GraduationCap className="w-8 h-8" />
           </Link>
-          <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100">Create Campus ID</h2>
+          <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 font-display">
+            {showOtpScreen ? "Verify Email" : "Create Campus ID"}
+          </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            Join the peer-to-peer ecosystem. Use your university <code className="text-purple-600 font-bold bg-purple-50 dark:bg-purple-950/50 px-1.5 py-0.5 rounded">.edu</code> email for instant verified student status.
+            {showOtpScreen 
+              ? "We sent a 6-digit OTP code to verify your email address." 
+              : "Join the peer-to-peer student marketplace. Register using any email address, including your personal Gmail."}
           </p>
         </div>
 
@@ -96,109 +139,173 @@ export default function Register() {
         {success && (
           <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/80 text-emerald-600 dark:text-emerald-400 text-xs rounded-2xl flex items-center animate-slide-up">
             <CheckCircle2 className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span>{success} Entering campus marketplace...</span>
+            <span>{success}</span>
           </div>
         )}
 
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
-          
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Full Name *</label>
-            <div className="relative">
-              <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+        {showOtpScreen ? (
+          /* OTP Verification Screen */
+          <form onSubmit={handleOtpSubmit} className="space-y-6 relative z-10 animate-fade-in">
+            <div className="text-center space-y-2">
+              <span className="inline-flex p-3 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-2xl border border-purple-100 dark:border-purple-900/60 mb-2">
+                <ShieldCheck className="w-6 h-6 animate-pulse" />
+              </span>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                A 6-digit OTP code has been sent to your email:
+              </p>
+              <p className="text-sm font-extrabold text-purple-600 dark:text-purple-400 break-all">
+                {email}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block text-center">
+                Enter Verification Code *
+              </label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Rahul Verma"
-                className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
+                maxLength="6"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                className="w-full text-center px-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-xl tracking-[0.5em] rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-black text-slate-800 dark:text-slate-100 placeholder:opacity-40"
                 required
+                disabled={isVerifying}
               />
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">College Email Address *</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. rahul.mech@college.edu"
-                className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
-                required
-              />
-            </div>
-            {email && email.includes('@') && (
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center mt-1">
-                <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Eligible for auto-verified student badge!
-              </span>
-            )}
-          </div>
+            <button
+              type="submit"
+              disabled={isVerifying}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl font-extrabold text-sm shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 flex items-center justify-center transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              {isVerifying ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                  Verifying Code...
+                </>
+              ) : (
+                <>
+                  <span>Verify OTP & Launch Dashboard</span>
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </button>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtpScreen(false);
+                setOtp('');
+                setError('');
+                setSuccess('');
+              }}
+              className="w-full py-2.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors text-center"
+            >
+              Back to Registration
+            </button>
+          </form>
+        ) : (
+          /* Registration Form */
+          <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+            
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Branch / Major</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Full Name *</label>
               <div className="relative">
-                <BookOpen className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-                <select
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
+                <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Rahul Verma"
                   className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
-                >
-                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
+                  required
+                />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Batch Year</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Email Address *</label>
               <div className="relative">
-                <Calendar className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-                <select
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
+                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g. rahul.verma@gmail.com"
                   className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
-                >
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                  required
+                />
+              </div>
+              {email && email.includes('@') && (
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center mt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Eligible for instant verified student badge!
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Branch / Major</label>
+                <div className="relative">
+                  <BookOpen className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200/70 dark:border-slate-700/70 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
+                  >
+                    {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Batch Year</label>
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200/70 dark:border-slate-700/70 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
+                  >
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Create Password *</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
-                className="w-full pl-11 pr-12 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Create Password *</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full pl-11 pr-12 py-3 bg-slate-100 dark:bg-slate-900/80 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 dark:text-slate-100"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl font-extrabold text-sm shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 flex items-center justify-center transform hover:-translate-y-0.5"
-          >
-            <span>Register & Join Community</span>
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </button>
+            <button
+              type="submit"
+              className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl font-extrabold text-sm shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-200 flex items-center justify-center transform hover:-translate-y-0.5"
+            >
+              <span>Register & Join Community</span>
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </button>
 
-        </form>
+          </form>
+        )}
 
         {/* Footer link */}
         <div className="pt-4 border-t border-slate-100 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">

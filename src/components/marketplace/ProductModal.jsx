@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { X, MessageSquareText, ShieldCheck, Heart, AlertTriangle, CheckCircle2, Clock, Tag, Share2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, MessageSquareText, ShieldCheck, Heart, AlertTriangle, CheckCircle2, Clock, Tag, Share2, ShoppingBag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { API_URL } from '../../config';
 
 export default function ProductModal() {
-  const { selectedProductModal, setSelectedProductModal, startChatWithSeller, wishlist, toggleWishlist, reportItem } = useApp();
+  const { selectedProductModal, setSelectedProductModal, startChatWithSeller, expressInterestOrBuy, wishlist, toggleWishlist, reportItem } = useApp();
   const [isReporting, setIsReporting] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const navigate = useNavigate();
 
   if (!selectedProductModal) return null;
   const product = selectedProductModal;
   const isWishlisted = wishlist.includes(product.id);
+  const rawImage = product.image_url || product.image;
+  const imageUrl = rawImage && (rawImage.startsWith('http') || rawImage.startsWith('data:') || rawImage.startsWith('blob:'))
+    ? rawImage 
+    : (rawImage ? `${API_URL}/${rawImage}` : '');
 
   const handleReport = (e) => {
     e.preventDefault();
@@ -32,7 +39,7 @@ export default function ProductModal() {
 
         {/* Left Image Section */}
         <div className="md:w-1/2 relative bg-slate-100 dark:bg-slate-950 min-h-[300px] md:min-h-full flex items-center justify-center overflow-hidden">
-          <img src={product.image} alt={product.title} className="w-full h-full object-cover max-h-[500px] md:max-h-full" />
+          <img src={imageUrl} alt={product.title} className="w-full h-full object-cover max-h-[500px] md:max-h-full" />
           <div className="absolute bottom-4 left-4 flex gap-2">
             <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-white text-xs font-bold rounded-xl">
               {product.condition}
@@ -147,10 +154,16 @@ export default function ProductModal() {
 
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
-              onClick={() => startChatWithSeller(product)}
+              onClick={async () => {
+                const res = await expressInterestOrBuy(product.id);
+                if (res && res.success) {
+                  setSelectedProductModal(null);
+                  navigate('/buyer-dashboard');
+                }
+              }}
               className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-extrabold text-base flex items-center justify-center shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 transform hover:-translate-y-0.5"
             >
-              <MessageSquareText className="w-5 h-5 mr-2" /> Start Chat With {product.seller.name.split(' ')[0]}
+              <ShoppingBag className="w-5 h-5 mr-2" /> Express Interest / Buy Now
             </button>
           </div>
         </div>

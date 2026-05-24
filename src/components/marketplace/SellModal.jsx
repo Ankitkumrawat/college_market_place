@@ -15,6 +15,8 @@ export default function SellModal() {
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [selectedPreset, setSelectedPreset] = useState(0);
+  const [customFile, setCustomFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Unsplash high quality presets for quick demo item creation
@@ -27,6 +29,24 @@ export default function SellModal() {
   ];
 
   if (!isSellModalOpen) return null;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCustomFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setSelectedPreset(-1); // Deselect preset since we have custom file
+    }
+  };
+
+  const handlePresetSelect = (idx) => {
+    setSelectedPreset(idx);
+    setCustomFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,21 +63,33 @@ export default function SellModal() {
         return;
       }
 
-      const productPayload = {
-        title,
-        price: Number(price),
-        original_price: originalPrice ? Number(originalPrice) : null,
-        condition,
-        category,
-        image_url: imagePresets[selectedPreset].url,
-        description: description || "No detailed description provided.",
-        tags: tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]
-      };
+      // Construct FormData for multipart upload
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('price', Number(price));
+      if (originalPrice) {
+        formData.append('original_price', Number(originalPrice));
+      }
+      formData.append('condition', condition);
+      formData.append('category', category);
+      formData.append('description', description || "No detailed description provided.");
+      formData.append('tags', JSON.stringify(tagsArray.length > 0 ? tagsArray : [category, "College Essentials"]));
 
-      // Perform POST request to FastAPI endpoint
-      await axios.post(`${API_URL}/api/products`, productPayload, {
+      // If a custom file is uploaded, use it. Otherwise, fetch the preset image and convert to file.
+      if (customFile) {
+        formData.append('image', customFile);
+      } else {
+        const response = await fetch(imagePresets[selectedPreset].url);
+        const blob = await response.blob();
+        const presetFile = new File([blob], 'preset.jpg', { type: 'image/jpeg' });
+        formData.append('image', presetFile);
+      }
+
+      // Perform POST request to FastAPI endpoint with form-data
+      const response = await axios.post(`${API_URL}/api/products`, formData, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
         }
       });
 
@@ -65,8 +97,8 @@ export default function SellModal() {
       if (fetchProducts) {
         await fetchProducts();
       } else if (addProduct) {
-        // Fallback to update state locally
-        addProduct(productPayload);
+        // Fallback to update state locally using the response object from backend
+        addProduct(response.data);
       }
 
       setIsSellModalOpen(false);
@@ -77,6 +109,12 @@ export default function SellModal() {
       setOriginalPrice('');
       setDescription('');
       setTagsInput('');
+      setCustomFile(null);
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+        setImagePreview(null);
+      }
+      setSelectedPreset(0);
     } catch (error) {
       console.error("Error uploading listing to backend:", error);
       alert(error.response?.data?.detail || "Could not publish your listing. Please verify your connection.");
@@ -111,31 +149,94 @@ export default function SellModal() {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6 max-h-[75vh] overflow-y-auto">
           
-          {/* Image Selection Presets */}
-          <div className="space-y-2">
+          {/* Image Selection / Custom Upload */}
+          <div className="space-y-3">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
-              Select Item Image Preset
+              Item Image *
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {imagePresets.map((preset, idx) => (
-                <div 
-                  key={preset.name}
-                  onClick={() => setSelectedPreset(idx)}
-                  className={`relative rounded-xl overflow-hidden cursor-pointer h-20 border-2 transition-all ${
-                    selectedPreset === idx ? 'border-indigo-600 shadow-lg ring-2 ring-indigo-500/30' : 'border-transparent opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm p-1 text-[10px] text-white font-semibold text-center truncate">
-                    {preset.name}
-                  </div>
-                  {selectedPreset === idx && (
-                    <div className="absolute top-1 right-1 bg-indigo-600 text-white rounded-full p-0.5">
-                      <Check className="w-3 h-3" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Custom Upload Area */}
+              <div className="relative">
+                <label className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-200 overflow-hidden group">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {customFile ? (
+                    <div className="w-full h-full relative">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                        <Upload className="w-4 h-4" />
+                        <span>Replace Image</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center p-4">
+                      <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/50 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-200">
+                        <Upload className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
+                        Upload custom image
+                      </span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 block mt-1">
+                        PNG, JPG up to 5MB
+                      </span>
                     </div>
                   )}
+                </label>
+              </div>
+
+              {/* Preset Gallery */}
+              <div className="space-y-2 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-2">
+                    Or choose a preset template:
+                  </span>
+                  <div className="grid grid-cols-5 gap-2">
+                    {imagePresets.map((preset, idx) => (
+                      <div
+                        key={preset.name}
+                        onClick={() => handlePresetSelect(idx)}
+                        className={`relative rounded-xl overflow-hidden cursor-pointer h-14 border-2 transition-all duration-200 ${
+                          selectedPreset === idx && !customFile
+                            ? 'border-indigo-600 shadow-md ring-2 ring-indigo-500/30 opacity-100'
+                            : 'border-transparent opacity-60 hover:opacity-100'
+                        }`}
+                        title={preset.name}
+                      >
+                        <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                        {selectedPreset === idx && !customFile && (
+                          <div className="absolute inset-0 bg-indigo-600/10 flex items-center justify-center">
+                            <div className="bg-indigo-600 text-white rounded-full p-0.5">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+                {/* Active Image Preview Indicator */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/80 flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                    <img
+                      src={customFile ? imagePreview : imagePresets[selectedPreset]?.url}
+                      alt="Active listing preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                      Active Listing Image
+                    </span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate block">
+                      {customFile ? `Custom: ${customFile.name}` : `Preset: ${imagePresets[selectedPreset]?.name}`}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

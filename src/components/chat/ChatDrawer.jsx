@@ -1,19 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, ShieldCheck, Clock, Check, MessageSquareText, GraduationCap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { API_URL } from '../../config';
 
 export default function ChatDrawer() {
-  const { isChatOpen, setIsChatOpen, chats, activeChatId, setActiveChatId, sendMessage, user } = useApp();
+  const { isChatOpen, setIsChatOpen, chats, activeChatId, setActiveChatId, fetchConversations, user } = useApp();
   const [inputText, setInputText] = useState('');
-
-  if (!isChatOpen) return null;
+  const [localMessages, setLocalMessages] = useState([]);
+  const socketRef = useRef(null);
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0];
 
+  // Sync local messages state when active conversation or global chats change
+  useEffect(() => {
+    if (activeChat) {
+      setLocalMessages(activeChat.messages || []);
+    } else {
+      setLocalMessages([]);
+    }
+  }, [activeChatId, chats]);
+
+  // Handle WebSocket Connection Lifecycle
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !isChatOpen || !activeChat) return;
+
+    let ws = null;
+    try {
+      const wsHost = API_URL.replace(/^https?:\/\//, '');
+      const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${wsHost}/api/chat/ws/${token}`;
+      
+      ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Match active partner ID from activeChatId key format (chat_{partnerId}_{productId})
+          const parts = activeChat.id.replace('chat_', '').split('_');
+          const partnerId = parseInt(parts[0], 10);
+          
+          const isFromActivePartner = data.sender_id === partnerId || data.receiver_id === partnerId;
+          
+          if (isFromActivePartner) {
+            const formattedMsg = {
+              sender: data.sender_id === user.id ? 'me' : 'them',
+              text: data.text,
+              time: data.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setLocalMessages(prev => [...prev, formattedMsg]);
+          }
+
+          // Background sync to update sidebar / unread counters
+          if (fetchConversations) {
+            fetchConversations();
+          }
+        } catch (e) {
+          console.error("Failed to parse incoming WS text:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket chat drawer connection closed.");
+      };
+
+    } catch (err) {
+      console.error("Websocket initialization failed in ChatDrawer:", err);
+    }
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [activeChatId, isChatOpen]);
+
+  if (!isChatOpen) return null;
+
   const handleSend = (e) => {
     e.preventDefault();
-    if (!inputText || !inputText.trim() || !activeChat) return;
-    sendMessage(activeChat.id, inputText.trim());
+    if (!inputText || !inputText.trim() || !activeChat || !socketRef.current) return;
+    
+    const text = inputText.trim();
+    
+    // Parse partnerId and productId from activeChatId key format chat_{partnerId}_{productId}
+    const parts = activeChat.id.replace('chat_', '').split('_');
+    const partnerId = parseInt(parts[0], 10);
+    const productId = parts[1] && parts[1] !== '0' ? parseInt(parts[1], 10) : null;
+
+    if (socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        receiver_id: partnerId,
+        product_id: productId,
+        text: text
+      }));
+    } else {
+      console.error("WebSocket is not open. Connection state:", socketRef.current.readyState);
+    }
+    
     setInputText('');
   };
 
@@ -96,8 +182,8 @@ export default function ChatDrawer() {
 
             {/* Message History */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-slate-950/60">
-              {activeChat.messages && activeChat.messages.length > 0 ? (
-                activeChat.messages.map((msg, index) => {
+              {localMessages && localMessages.length > 0 ? (
+                localMessages.map((msg, index) => {
                   const isMe = msg.sender === 'me';
                   return (
                     <div key={index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
@@ -133,7 +219,7 @@ export default function ChatDrawer() {
               />
               <button
                 type="submit"
-                className="p-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-md flex items-center justify-center transform hover:scale-105 transition-all"
+                className="p-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-md flex items-center justify-center transform scale-100 hover:scale-105 transition-all"
               >
                 <Send className="w-5 h-5" />
               </button>
