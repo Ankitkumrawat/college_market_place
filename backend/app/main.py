@@ -23,7 +23,7 @@ if os.path.exists(db_file):
                 
         if "products" in tables:
             prod_columns = [col["name"] for col in inspector.get_columns("products")]
-            if "is_sold" not in prod_columns or "status" not in prod_columns:
+            if "is_sold" not in prod_columns or "status" not in prod_columns or "report_count" not in prod_columns:
                 recreate_db = True
                 
         if "conversations" in tables and "orders" not in tables:
@@ -48,6 +48,9 @@ if os.path.exists(db_file):
                         db_session.commit()
                     if "is_sold" not in prod_columns:
                         db_session.execute(text("ALTER TABLE products ADD COLUMN is_sold BOOLEAN DEFAULT 0"))
+                        db_session.commit()
+                    if "report_count" not in prod_columns:
+                        db_session.execute(text("ALTER TABLE products ADD COLUMN report_count INTEGER DEFAULT 0"))
                         db_session.commit()
                     print("In-place schema migration succeeded!")
                 except Exception as alter_err:

@@ -40,6 +40,7 @@ class Product(Base):
     seller_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(String, default="active", nullable=False)  # "active", "sold"
     is_sold = Column(Boolean, default=False, nullable=False)
+    report_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships

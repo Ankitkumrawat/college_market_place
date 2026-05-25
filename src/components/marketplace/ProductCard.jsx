@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageSquareText, ShieldCheck, Tag, Star, Sparkles, ShoppingBag } from 'lucide-react';
+import axios from 'axios';
+import { Heart, MessageSquareText, ShieldCheck, Tag, Star, Sparkles, ShoppingBag, Flag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { API_URL } from '../../config';
 
@@ -8,6 +9,7 @@ export default function ProductCard({ product }) {
   const { wishlist, toggleWishlist, setSelectedProductModal, startChatWithSeller, expressInterestOrBuy } = useApp();
   const isWishlisted = wishlist.includes(product.id);
   const navigate = useNavigate();
+  const [isHidden, setIsHidden] = useState(false);
 
   const getConditionColor = (cond) => {
     switch (cond) {
@@ -29,6 +31,8 @@ export default function ProductCard({ product }) {
     : false;
 
   const savings = originalPrice ? Math.round(((originalPrice - product.price) / originalPrice) * 100) : 0;
+
+  if (isHidden) return null;
 
   return (
     <div className="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative transform hover:-translate-y-1.5">
@@ -55,6 +59,29 @@ export default function ProductCard({ product }) {
             </span>
           )}
         </div>
+
+        {/* Report Spam Button */}
+        <button
+          onClick={async (e) => { 
+            e.stopPropagation();
+            if (window.confirm("Are you sure you want to report this listing as spam or inappropriate?")) {
+              try {
+                await axios.post(`${API_URL}/api/products/${product.id}/report`, {}, {
+                  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                alert("Thank you for flagging this item. Our community moderation layer is reviewing it.");
+                setIsHidden(true);
+              } catch (err) {
+                console.error("Error reporting product:", err);
+                alert("Failed to report listing. Please check your login session and try again.");
+              }
+            }
+          }}
+          className="absolute top-3 right-14 p-2.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-white/20 shadow-lg text-slate-700 dark:text-slate-200 hover:text-red-650 dark:hover:text-red-400 hover:scale-110 transition-all duration-200 z-10"
+          title="Report Spam"
+        >
+          <Flag className="w-5 h-5" />
+        </button>
 
         {/* Wishlist Button */}
         <button

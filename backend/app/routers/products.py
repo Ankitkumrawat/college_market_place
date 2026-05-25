@@ -79,8 +79,11 @@ def get_products(
     db: Session = Depends(get_db)
 ):
     """Retrieve products matching filters (search text, category, price, condition)."""
-    # 🌟 BAS IS EK LINE KO BADLA HAI BHAI (Taaki bika hua saaman main screen par na dikhe)
-    query = db.query(models.Product).filter(models.Product.is_sold == False)
+    # Filter out sold products and items with 3 or more reports
+    query = db.query(models.Product).filter(
+        models.Product.is_sold == False,
+        models.Product.report_count < 3
+    )
     
     if q:
         query = query.filter(
@@ -330,3 +333,22 @@ def get_recommendations(
         "products": recommended_products,
         "resources": resources
     }
+
+@router.post("/{product_id}/report", status_code=status.HTTP_200_OK)
+def report_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Report a product for spam or inappropriate content. Increments report_count."""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found."
+        )
+    
+    product.report_count += 1
+    db.commit()
+    db.refresh(product)
+    return {"success": True, "detail": f"Product reported. Current report count: {product.report_count}"}

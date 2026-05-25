@@ -57,6 +57,7 @@ class ProductBase(BaseModel):
     tags: Optional[List[str]] = None
     status: Optional[str] = "active"
     is_sold: Optional[bool] = False
+    report_count: Optional[int] = 0
 
 class ProductCreate(ProductBase):
     pass
