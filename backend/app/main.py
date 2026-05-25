@@ -10,53 +10,43 @@ from sqlalchemy import inspect
 # Automatically create database tables on startup (suitable for development)
 # But first, check if database schema needs update (e.g. missing conversation_id in chat_messages, status/is_sold in products)
 db_file = "college_marketplace.db"
+if not os.path.exists(db_file) and os.path.exists(os.path.join("backend", db_file)):
+    db_file = os.path.join("backend", db_file)
+
 if os.path.exists(db_file):
     try:
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        recreate_db = False
+        import sqlite3
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
         
-        if "chat_messages" in tables:
-            columns = [col["name"] for col in inspector.get_columns("chat_messages")]
-            if "conversation_id" not in columns:
-                recreate_db = True
+        # Check products table columns
+        cursor.execute("PRAGMA table_info(products)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if columns:
+            if "status" not in columns:
+                cursor.execute("ALTER TABLE products ADD COLUMN status VARCHAR DEFAULT 'active'")
+                print("Added column 'status' to products table.")
+            if "is_sold" not in columns:
+                cursor.execute("ALTER TABLE products ADD COLUMN is_sold BOOLEAN DEFAULT 0")
+                print("Added column 'is_sold' to products table.")
+            if "report_count" not in columns:
+                cursor.execute("ALTER TABLE products ADD COLUMN report_count INTEGER DEFAULT 0")
+                print("Added column 'report_count' to products table.")
                 
-        if "products" in tables:
-            prod_columns = [col["name"] for col in inspector.get_columns("products")]
-            if "is_sold" not in prod_columns or "status" not in prod_columns or "report_count" not in prod_columns:
-                recreate_db = True
-                
-        if "conversations" in tables and "orders" not in tables:
-            recreate_db = True
-
-        if recreate_db:
-            print("Database schema outdated. Deleting local SQLite database for clean recreation...")
+        # Check chat_messages table columns
+        cursor.execute("PRAGMA table_info(chat_messages)")
+        chat_columns = [col[1] for col in cursor.fetchall()]
+        if chat_columns and "conversation_id" not in chat_columns:
+            conn.close()
+            print("Database schema outdated (missing conversation_id). Deleting local SQLite database for clean recreation...")
             try:
-                engine.dispose()
                 os.remove(db_file)
                 print("Outdated database file deleted.")
             except Exception as delete_err:
-                print(f"Failed to delete database file: {delete_err}. Attempting in-place schema migration fallback...")
-                from sqlalchemy import text
-                from app.database import SessionLocal
-                db_session = SessionLocal()
-                try:
-                    # In-place migrations for products table
-                    prod_columns = [col["name"] for col in inspector.get_columns("products")]
-                    if "status" not in prod_columns:
-                        db_session.execute(text("ALTER TABLE products ADD COLUMN status VARCHAR DEFAULT 'active'"))
-                        db_session.commit()
-                    if "is_sold" not in prod_columns:
-                        db_session.execute(text("ALTER TABLE products ADD COLUMN is_sold BOOLEAN DEFAULT 0"))
-                        db_session.commit()
-                    if "report_count" not in prod_columns:
-                        db_session.execute(text("ALTER TABLE products ADD COLUMN report_count INTEGER DEFAULT 0"))
-                        db_session.commit()
-                    print("In-place schema migration succeeded!")
-                except Exception as alter_err:
-                    print(f"In-place migration failed: {alter_err}")
-                finally:
-                    db_session.close()
+                print(f"Failed to delete database file: {delete_err}")
+        else:
+            conn.commit()
+            conn.close()
     except Exception as db_err:
         print(f"Pre-startup database migration check failed: {db_err}")
 

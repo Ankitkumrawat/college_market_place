@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, schemas
@@ -7,6 +9,11 @@ from app.utils import security
 from app.utils.email import send_otp_email
 import random
 import datetime
+
+class GoogleLoginRequest(BaseModel):
+    token: str
+    email: str
+    name: str
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -45,9 +52,12 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
         # Check if user already exists
         db_user = db.query(models.User).filter(models.User.email == user_in.email).first()
         if db_user:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An account with this email already exists."
+                content={
+                    "detail": "ALREADY_REGISTERED",
+                    "message": "Email is already registered. Redirecting to login..."
+                }
             )
         
         # Setup default avatar if not provided
@@ -195,3 +205,54 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(get_current_user)):
     """Fetch the authenticated student's profile."""
     return current_user
+
+@router.post("/google-login", response_model=schemas.Token)
+def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate Google OAuth token and issue JWT bearer token."""
+    email = payload.email.lower()
+    
+    # Check if user already exists
+    db_user = db.query(models.User).filter(models.User.email == email).first()
+    if not db_user:
+        # Create a new user automatically since it's their first time
+        branch = "Computer Science Engg."
+        year = "1st Year"
+        
+        avatar_list = [
+            "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80"
+        ]
+        avatar = random.choice(avatar_list)
+        college_id = f"COL-{datetime.datetime.now().year}-{random.randint(1000, 9999)}"
+        role = "admin" if email.startswith("admin") else "student"
+        
+        # Google OAuth users are instantly verified
+        db_user = models.User(
+            email=email,
+            name=payload.name,
+            password_hash=security.get_password_hash(f"google-oauth-secret-{random.randint(1000, 9999)}"),
+            branch=branch,
+            year=year,
+            avatar=avatar,
+            is_verified=True,
+            otp_code=None,
+            role=role,
+            college_id=college_id
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    
+    if db_user.is_banned:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended by system moderators."
+        )
+        
+    access_token = security.create_access_token(
+        data={"sub": db_user.email, "user_id": db_user.id}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}

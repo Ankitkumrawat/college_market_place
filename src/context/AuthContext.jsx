@@ -98,7 +98,32 @@ export const AuthProvider = ({ children }) => {
         message: response.data.message || "Registration successful! Logging you in..."
       };
     } catch (error) {
-      const errorMsg = parseErrorMessage(error, 'Registration failed. Check details or email domain.');
+      throw error;
+    }
+  };
+
+  // Google Login function
+  const googleLogin = async (googleToken, email, name) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/google-login`, {
+        token: googleToken,
+        email,
+        name
+      });
+      const { access_token } = response.data;
+      localStorage.setItem('token', access_token);
+
+      // Fetch user profile immediately
+      const profileResponse = await axios.get(`${API_URL}/api/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${access_token}`
+        }
+      });
+      
+      setCurrentUser(profileResponse.data);
+      return { success: true, message: `Successfully authenticated with Google as ${profileResponse.data.name}!` };
+    } catch (error) {
+      const errorMsg = parseErrorMessage(error, 'Google authentication failed.');
       return { success: false, message: errorMsg };
     }
   };
@@ -157,6 +182,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       register,
+      googleLogin,
       verifyOtp,
       logout,
       verifyCurrentStudent

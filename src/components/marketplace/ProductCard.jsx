@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { API_URL } from '../../config';
 
 export default function ProductCard({ product }) {
-  const { wishlist, toggleWishlist, setSelectedProductModal, startChatWithSeller, expressInterestOrBuy } = useApp();
+  const { wishlist, toggleWishlist, setSelectedProductModal, startChatWithSeller, expressInterestOrBuy, setProducts } = useApp();
   const isWishlisted = wishlist.includes(product.id);
   const navigate = useNavigate();
   const [isHidden, setIsHidden] = useState(false);
@@ -71,6 +71,7 @@ export default function ProductCard({ product }) {
                 });
                 alert("Thank you for flagging this item. Our community moderation layer is reviewing it.");
                 setIsHidden(true);
+                setProducts(prevProducts => prevProducts.filter(p => p.id !== product.id));
               } catch (err) {
                 console.error("Error reporting product:", err);
                 alert("Failed to report listing. Please check your login session and try again.");
