@@ -193,3 +193,140 @@ def mark_product_as_sold(
     db.commit()
     db.refresh(product)
     return product
+
+
+@router.get("/recommendations")
+def get_recommendations(
+    branch: Optional[str] = None,
+    year: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Retrieve personalized product recommendations and study resources based on student's branch and year."""
+    user_branch = branch or current_user.branch or "Computer Science Engg."
+    user_year = year or current_user.year or "1st Year"
+    
+    query = db.query(models.Product).filter(models.Product.status == "active")
+    all_products = query.all()
+    
+    recommended_products = []
+    for prod in all_products:
+        title_lower = prod.title.lower() if prod.title else ""
+        desc_lower = prod.description.lower() if prod.description else ""
+        tags_list = prod.tags if prod.tags and isinstance(prod.tags, list) else []
+        tags_lower = [t.lower() for t in tags_list]
+        
+        branch_words = [w.lower() for w in user_branch.split() if len(w) > 2]
+        match = False
+        
+        for word in branch_words:
+            if word in title_lower or word in desc_lower or any(word in t for t in tags_lower):
+                match = True
+                break
+                
+        if "math" in title_lower or "physics" in title_lower or "calculator" in title_lower or "drafter" in title_lower:
+            match = True
+            
+        if match:
+            recommended_products.append(prod)
+            
+    recommended_products = recommended_products[:3]
+    
+    branch_lower = user_branch.lower()
+    resources = []
+    
+    if "computer" in branch_lower or "information" in branch_lower or "cs" in branch_lower or "it" in branch_lower:
+        resources = [
+            {
+                "id": "rec1",
+                "title": "Data Structures & Algorithms Roadmap 2026",
+                "type": "Study Guide",
+                "matchRatio": "98% Match",
+                "reason": "Essential DSA preparation tracker for your upcoming internship drive.",
+                "url": "#",
+                "tag": "Highly Recommended"
+            },
+            {
+                "id": "rec2",
+                "title": f"DBMS & Operating Systems Semester Cheat Sheets ({user_year})",
+                "type": "Exam Prep",
+                "matchRatio": "94% Match",
+                "reason": f"Most asked interview questions and solved midterm topics.",
+                "url": "#",
+                "tag": "Trending Now"
+            },
+            {
+                "id": "rec3",
+                "title": "Full-Stack Web Development Starter Guide",
+                "type": "Project Resource",
+                "matchRatio": "88% Match",
+                "reason": "Practical web dev roadmap for building resume-worthy semester projects.",
+                "url": "#",
+                "tag": "Smart Match"
+            }
+        ]
+    elif "electr" in branch_lower or "ece" in branch_lower or "ee" in branch_lower:
+        resources = [
+            {
+                "id": "rec1",
+                "title": "VLSI & Digital Logic Design Lab Guide",
+                "type": "Lab Resource",
+                "matchRatio": "96% Match",
+                "reason": "Complete solved Verilog testbenches for semester ALU tests.",
+                "url": "#",
+                "tag": "Highly Recommended"
+            },
+            {
+                "id": "rec2",
+                "title": "Microcontrollers (8085/8086) Assembly Cheat Sheet",
+                "type": "Exam Prep",
+                "matchRatio": "92% Match",
+                "reason": "Direct reference charts for instruction sets and interrupts.",
+                "url": "#",
+                "tag": "Trending Now"
+            },
+            {
+                "id": "rec3",
+                "title": "Analog & Digital Communications Lecture Notes",
+                "type": "Study Guide",
+                "matchRatio": "89% Match",
+                "reason": "Handwritten topper summary summary Fourier transforms.",
+                "url": "#",
+                "tag": "Smart Match"
+            }
+        ]
+    else:
+        resources = [
+            {
+                "id": "rec1",
+                "title": "Engineering Mechanics & Applied Physics Solver",
+                "type": "Exam Prep",
+                "matchRatio": "95% Match",
+                "reason": "Step-by-step solutions for past university dynamics questions.",
+                "url": "#",
+                "tag": "Highly Recommended"
+            },
+            {
+                "id": "rec2",
+                "title": "Engineering Drawing & Mini-Drafter Setup Manual",
+                "type": "Graphics Lab",
+                "matchRatio": "90% Match",
+                "reason": "Isometric projections and orthographic drawing tutorials.",
+                "url": "#",
+                "tag": "Trending Now"
+            },
+            {
+                "id": "rec3",
+                "title": "Industrial Internships & Training Roadmap",
+                "type": "Career Guide",
+                "matchRatio": "85% Match",
+                "reason": "Recommended certificates and core industry training tracks.",
+                "url": "#",
+                "tag": "Smart Match"
+            }
+        ]
+        
+    return {
+        "products": recommended_products,
+        "resources": resources
+    }

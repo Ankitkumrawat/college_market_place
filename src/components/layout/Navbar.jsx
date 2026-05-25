@@ -13,7 +13,7 @@ export default function Navbar() {
     activeTab, setActiveTab,
     searchQuery, setSearchQuery,
     selectedCategory, setSelectedCategory,
-    wishlist, notifications,
+    wishlist, notifications, setNotifications,
     setIsWishlistOpen, setIsChatOpen, 
     setIsSellModalOpen, setIsVerifyModalOpen,
     setIsNotificationsOpen
@@ -24,6 +24,7 @@ export default function Navbar() {
   const location = useLocation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const unreadNotifs = notifications.filter(n => n.unread).length;
 
   const categories = ["All", "Notes", "Calculators", "Engineering tools", "Lab equipment", "Books", "Electronics", "Hostel essentials", "Study materials"];
@@ -214,18 +215,63 @@ export default function Navbar() {
               </button>
 
               {/* Notifications */}
-              <button 
-                onClick={() => setIsNotificationsOpen(true)}
-                className="p-2 sm:p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl relative transition-colors"
-                title="Notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadNotifs > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow">
-                    {unreadNotifs}
-                  </span>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotifDropdownOpen(!isNotifDropdownOpen)}
+                  className="p-2 sm:p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl relative transition-colors"
+                  title="Notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow animate-fade-in">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {isNotifDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden z-50 animate-slide-up">
+                    <div className="p-4 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-between">
+                      <h4 className="text-xs font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase">Notifications</h4>
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setNotifications([]);
+                            setIsNotifDropdownOpen(false);
+                          }}
+                          className="text-[10px] font-bold text-indigo-650 hover:text-indigo-750 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-wider"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 space-y-1">
+                          <Bell className="w-8 h-8 mx-auto text-slate-300 opacity-60 animate-bounce-subtle" />
+                          <p className="font-bold text-xs text-slate-700 dark:text-slate-350">All caught up!</p>
+                          <p className="text-[10px] leading-relaxed">No new alerts to show right now.</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div key={notif.id} className="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left">
+                            <div className="flex items-start justify-between gap-2">
+                              <h5 className="font-bold text-xs text-slate-800 dark:text-slate-100 leading-tight">
+                                {notif.title}
+                              </h5>
+                              <span className="text-[9px] text-slate-450 whitespace-nowrap">{notif.time || "Just now"}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                              {notif.message}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
 
               {/* Theme toggle */}
               <button 

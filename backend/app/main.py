@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app import models
-from app.routers import auth, products, chat, admin
+from app.routers import auth, products, chat, admin, ai
 
 import os
 from sqlalchemy import inspect
@@ -102,6 +102,7 @@ app.include_router(chat.router)
 app.include_router(chat.buyer_router)
 app.include_router(chat.seller_router)
 app.include_router(admin.router)
+app.include_router(ai.router)
 
 @app.get("/")
 def read_root():

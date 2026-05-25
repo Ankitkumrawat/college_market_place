@@ -20,6 +20,7 @@ import AdminPanel from './components/admin/AdminPanel';
 import Chat from './components/chat/Chat';
 import BuyerDashboard from './components/dashboard/BuyerDashboard';
 import SellerDashboard from './components/dashboard/SellerDashboard';
+import CampusBuddyChat from './components/dashboard/CampusBuddyChat';
 
 function CampusHome() {
   const { activeTab } = useApp();
@@ -46,6 +47,7 @@ function MainLayout({ children }) {
       <ChatDrawer />
       <WishlistDrawer />
       <NotificationDrawer />
+      <CampusBuddyChat />
     </div>
   );
 }

@@ -158,8 +158,13 @@ export const AppProvider = ({ children }) => {
           // Sync conversation log in state
           fetchConversations();
           
-          // Trigger user alert if they received a message from someone else
-          if (data.sender_id !== currentUser.id) {
+          // Trigger user alert for specific notification types or new messages
+          if (data.type === 'NOTIFICATION' || data.type === 'BUY_REQUEST') {
+            addNotification(
+              "New Buyer Alert! 🔥", 
+              `Someone is highly interested in your listed item! Check your Seller Dashboard.`
+            );
+          } else if (data.sender_id !== currentUser.id) {
             addNotification("New Message", data.text);
           }
         } catch (e) {
@@ -193,10 +198,7 @@ export const AppProvider = ({ children }) => {
   }, [wishlist]);
 
   // Notifications state
-  const [notifications, setNotifications] = useState([
-    { id: "n1", title: "New listing alert", message: "Aarav Sharma added 'Arduino IoT Starter Kit'", time: "3 hours ago", unread: true },
-    { id: "n2", title: "Message received", message: "Priya Patel replied to your inquiry", time: "1 day ago", unread: false }
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   // UI state
   const [activeTab, setActiveTab] = useState('marketplace'); // 'marketplace', 'community', 'smart-match'
